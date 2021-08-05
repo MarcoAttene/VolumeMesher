@@ -14,7 +14,7 @@ Once done, you may build the executable as follows (put ``Release`` or ``Debug``
 ```
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=<build type> ..
+cmake ..
 ```
 This will produce an appropriate building configuration for your system.
 On Windows MSVC, this will produce a mesh_generator.sln file.
