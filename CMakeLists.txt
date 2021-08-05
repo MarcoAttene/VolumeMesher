@@ -19,10 +19,10 @@ set (SOURCES
     src/extended_predicates.cpp
     src/BSP.cpp
     src/inOutPartition.cpp
-    Indirect_Predicates-master/implicit_point.cpp
-    Indirect_Predicates-master/numerics.cpp
-    Indirect_Predicates-master/predicates/hand_optimized_predicates.cpp
-    Indirect_Predicates-master/predicates/indirect_predicates.cpp
+    Indirect_Predicates/implicit_point.cpp
+    Indirect_Predicates/numerics.cpp
+    Indirect_Predicates/predicates/hand_optimized_predicates.cpp
+    Indirect_Predicates/predicates/indirect_predicates.cpp
 )
 
 # add the executable
@@ -65,8 +65,8 @@ endif()
 # Public include directory
 target_include_directories(${TARGET} PUBLIC
 	src
-	Indirect_Predicates-master
-	Indirect_Predicates-master/predicates
+	Indirect_Predicates
+	Indirect_Predicates/predicates
 )
 endforeach(TARGET)
 
