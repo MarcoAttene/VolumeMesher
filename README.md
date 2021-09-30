@@ -1,9 +1,9 @@
 # Convex Polyhedral Meshing for Robust Solid Modeling
 
-This code implements our volume meshing algorithm described in "**Convex Polyhedral Meshing for Robust Solid Modeling**" conditionally accepted for publication on ACM TOG (SIGGRAPH Asia 2021). 
+This code implements our volume meshing algorithm described in "**Convex Polyhedral Meshing for Robust Solid Modeling**" by Lorenzo Diazzi and Marco Attene (ACM Trans Graphics Vol 40, N. 6, Procs of SIGGRAPH Asia 2021). 
+Please refer to our paper for details. You may download a copy here: http://arxiv.org/abs/2109.14434
 
 <p align="center"><img src="teaser_img.png"></p>
-
 
 ## Usage
 Clone this repository, including submodules, with:
