@@ -3,6 +3,8 @@
 #include <iostream>
 #include <fstream>
 
+/* This file contains modified source code from hxt_SeqDel (Copyright (C) 2018 Célestin Marot), a sequential Delaunay triangulator hosted at https://git.immc.ucl.ac.be/hextreme/hxt_seqdel as of 2020 (commit d5a9a762f6378edaf2e4dadf2acd6fe441b766e9) */
+
 TetMesh::TetMesh() : 
     vertices(NULL), num_vertices(0), 
     tet_node(NULL), tet_neigh(NULL), tet_subdet(NULL), tet_num(0), tet_size(0), tet_num_vertices(0), mark_tetrahedra(NULL), 
