@@ -1,6 +1,8 @@
 #ifndef _DELAUNAY_
 #define _DELAUNAY_
 
+/* This file contains modified source code from hxt_SeqDel (Copyright (C) 2018 Célestin Marot), a sequential Delaunay triangulator hosted at https://git.immc.ucl.ac.be/hextreme/hxt_seqdel as of 2020 (commit d5a9a762f6378edaf2e4dadf2acd6fe441b766e9) */
+
 #include "implicit_point.h"
 #include <cstring>
 
