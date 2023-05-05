@@ -62,7 +62,6 @@ creates a file called ``black_faces.off`` representing the input model with inte
 We tested our code on MacOS (GCC-10) and Windows (MSVC 2019).
 It should work on Linux-GCC and MacOS-Clang too, but we have not tested it on these configurations.
 
-|:warning: WARNING: Apparently, CLANG does not support a fully IEEE compliant floating point environment which is necessary to guarantee that indirect predicates work as expected. The only way we found to guarantee correctness on this compiler was to disable all optimizations. Please be aware of this fact should you notice a performance degradation in your experiments. |
 | --- |
 
 ## Citing us
