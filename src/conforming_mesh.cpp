@@ -730,7 +730,7 @@ uint32_t place_virtual_constraints(TetMesh* mesh, constraints_t* constraints,
     uint32_t num_virtual_constraints = 0;
 
     uint32_t he=0;    // half-edge index.
-    while(he < num_half_edges -1){
+    while(he < num_half_edges){
 
       uint32_t onSameEdge = 1; // Counts how many constraints are
                                // incident on current half-edge.
