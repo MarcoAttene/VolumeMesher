@@ -1,14 +1,12 @@
 #ifndef _DELAUNAY_
 #define _DELAUNAY_
 
-/* This file contains modified source code from hxt_SeqDel (Copyright (C) 2018 Célestin Marot), a sequential Delaunay triangulator hosted at https://git.immc.ucl.ac.be/hextreme/hxt_seqdel as of 2020 (commit d5a9a762f6378edaf2e4dadf2acd6fe441b766e9) */
-
 #include "implicit_point.h"
 #include <cstring>
 
 int orient2d(double p1x, double p1y, double p2x, double p2y, double p3x, double p3y);
 int orient3d(double px, double py, double pz, double qx, double qy, double qz, double rx, double ry, double rz, double sx, double sy, double sz);
-int insphere(const double pax, const double pay, const double paz, const double pbx, const double pby, const double pbz, const double pcx, const double pcy, const double pcz, const double pdx, const double pdy, const double pdz, const double pex, const double pey, const double pez);
+int inSphere(double pax, double pay, double paz, double pbx, double pby, double pbz, double pcx, double pcy, double pcz, double pdx, double pdy, double pdz, double pex, double pey, double pez);
 
 inline double orient2d(const double* p1, const double* p2, const double* p3)
 {
@@ -22,7 +20,7 @@ inline double orient3d(const double* p, const double* q, const double* r, const 
 
 inline double insphere(const double* pa, const double* pb, const double* pc, const double* pd, const double* pe)
 {
-    return -insphere(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2], pc[0], pc[1], pc[2], pd[0], pd[1], pd[2], pe[0], pe[1], pe[2]);
+    return -inSphere(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2], pc[0], pc[1], pc[2], pd[0], pd[1], pd[2], pe[0], pe[1], pe[2]);
 }
 
 
