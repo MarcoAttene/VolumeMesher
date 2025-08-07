@@ -556,7 +556,7 @@ void TetMesh::compute_subDet(const uint64_t tet)
 // incident tetrahedra in a vertex
 //---------------------------------
 
-// - Recursive function -
+// - This was initially recursive but led to stack overflows on big models. Turned to iterative.
 //  Input: tetrahedra (tet) index: tet_ind,
 //         the index of the vertex in which incidences are searched: central_vertex_ind,
 //         pointer to mesh,
@@ -567,27 +567,37 @@ void TetMesh::compute_subDet(const uint64_t tet)
 //         - is NOT a GHOST TETRHEDRON,
 //         - is NOT been already VISITED (mark_tetrahedra=0).
 //         If tot_incTet is incremented the relative tetrahedra is passed to this function...
+
 void count_incTet(uint64_t tet_ind, const uint32_t central_vertex_ind, TetMesh* mesh, uint64_t* tot_incTet){   // Mod.1
-    for(uint32_t i=0; i<4; i++)
-    {
-        if(mesh->tet_node[4*tet_ind+i] != central_vertex_ind)
+
+    static std::vector<uint64_t> vt_queue; // Static to avoid reallocation at each call
+    vt_queue.push_back(tet_ind);
+
+    while (!vt_queue.empty()) {
+        tet_ind = vt_queue.back(); vt_queue.pop_back();
+        for (uint32_t i = 0; i < 4; i++)
         {
-            uint64_t neigh_tet_ind = mesh->tet_neigh[4*tet_ind+i]>>2;
-            // ghost vertex is always in the last slot of the tetrahedron vertices.
+            if (mesh->tet_node[4 * tet_ind + i] != central_vertex_ind)
+            {
+                uint64_t neigh_tet_ind = mesh->tet_neigh[4 * tet_ind + i] >> 2;
+                // ghost vertex is always in the last slot of the tetrahedron vertices.
 
-            if(mesh->mark_tetrahedra[neigh_tet_ind]==1                        ||
-               mesh->tet_node[4* neigh_tet_ind +3] == INFINITE_VERTEX   )
-                continue;
+                if (mesh->mark_tetrahedra[neigh_tet_ind] == 1 ||
+                    mesh->tet_node[4 * neigh_tet_ind + 3] == INFINITE_VERTEX)
+                    continue;
 
-            mesh->mark_tetrahedra[ neigh_tet_ind ]=1;
-            (*tot_incTet)++;
-            count_incTet(neigh_tet_ind, central_vertex_ind, mesh, tot_incTet);
+                mesh->mark_tetrahedra[neigh_tet_ind] = 1;
+                (*tot_incTet)++;
+                vt_queue.push_back(neigh_tet_ind);
+            }
         }
     }
+
+    vt_queue.clear();
 }
 
 
-// - Recursive function -
+// - This was initially recursive but led to stack overflows on big models. Turned to iterative.
 //  Input: tetrahedra (tet) index: tet_ind,
 //         pointer to mesh,
 //         pointer to a tetraheron index type: incTet,
@@ -597,18 +607,36 @@ void count_incTet(uint64_t tet_ind, const uint32_t central_vertex_ind, TetMesh* 
 //         Face neighbour of tet is added to incTet if its marker is equal to 1.
 //         pos stores the number of elements of incTet.
 void save_incTet(uint64_t tet_ind, TetMesh* mesh, uint64_t* incTet, uint64_t* pos){      // Mod.1
-    for(uint32_t i=0; i<4; i++)
-    {
-        if( mesh->mark_tetrahedra[ mesh->tet_neigh[4*tet_ind+i]>>2 ] == 1 )
-        {
-            (*pos)++;
-            uint64_t neigh_tet_ind = mesh->tet_neigh[4*tet_ind+i]>>2;
-            incTet[*pos]=neigh_tet_ind;
-            mesh->mark_tetrahedra[neigh_tet_ind]=0;
+    uint64_t idx = 0;
+    incTet[idx++] = tet_ind;
+    mesh->mark_tetrahedra[tet_ind] = 0;
 
-            save_incTet(neigh_tet_ind, mesh, incTet, pos);
+    for (uint64_t j = 0; j < idx; j++) {
+        tet_ind = incTet[j];
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            if (mesh->mark_tetrahedra[mesh->tet_neigh[4 * tet_ind + i] >> 2] == 1)
+            {
+                uint64_t neigh_tet_ind = mesh->tet_neigh[4 * tet_ind + i] >> 2;
+                incTet[idx++] = neigh_tet_ind;
+                mesh->mark_tetrahedra[neigh_tet_ind] = 0;
+            }
         }
     }
+    *pos = idx;
+
+    //for(uint32_t i=0; i<4; i++)
+    //{
+    //    if( mesh->mark_tetrahedra[ mesh->tet_neigh[4*tet_ind+i]>>2 ] == 1 )
+    //    {
+    //        (*pos)++;
+    //        uint64_t neigh_tet_ind = mesh->tet_neigh[4*tet_ind+i]>>2;
+    //        incTet[*pos]=neigh_tet_ind;
+    //        mesh->mark_tetrahedra[neigh_tet_ind]=0;
+
+    //        save_incTet(neigh_tet_ind, mesh, incTet, pos);
+    //    }
+    //}
 
 }
 

@@ -1987,7 +1987,7 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
 //       detach a triangualr face from the face faces[face_ind].
 //       This 2 last edges are replaced in the vector face[face_ind].edges by
 //       one new edge: the one that closes the detached triangualr face.
-void BSPcomplex::triangle_detach(uint64_t face_ind){
+bool BSPcomplex::triangle_detach(uint64_t face_ind){
   BSPface& face = faces[face_ind];
   uint64_t num_face_edges = face.edges.size();
 
@@ -2002,6 +2002,13 @@ void BSPcomplex::triangle_detach(uint64_t face_ind){
       edges[s_12_ind].vertices[0], edges[s_12_ind].vertices[1]);
   uint32_t t0 = other_edge_endpt(edges[s_01_ind].vertices[0], edges[s_01_ind].vertices[1], t1);
   uint32_t t2 = other_edge_endpt(edges[s_12_ind].vertices[0], edges[s_12_ind].vertices[1], t1);
+
+  if (!genericPoint::misaligned(*vertices[t0], *vertices[t1], *vertices[t2])) return false;
+
+  uint64_t s_23_ind = face.edges[num_face_edges - 3];
+  uint32_t t3 = edges[s_23_ind].vertices[0];
+  if (t3 == t2) t3 = edges[s_23_ind].vertices[1];
+  if (!genericPoint::misaligned(*vertices[t0], *vertices[t2], *vertices[t3])) return false;
 
   // Connect t2 and t0 with a new edge.
   edges.push_back(BSPedge());
@@ -2060,6 +2067,7 @@ void BSPcomplex::triangle_detach(uint64_t face_ind){
   triangular_BSPface_isDegenerate(faces, edges, vertices, new_face_ind);
   #endif
 
+  return true;
 }
 
 //  Input:
@@ -2088,28 +2096,32 @@ void BSPcomplex::triangulateFace(uint64_t face_ind){
   // edges indices, of BSPface faces[face_ind], are listed in the vector
   // faces[face_ind].edges ordered as walking face-boundary clockwise
   // (or counterclockwise).
-  BSPface& face = faces[face_ind];
-  uint64_t num_face_edges = face.edges.size();
-
-  while(num_face_edges > 3){
-
-    // Check if last two edges are not-aligned.
-    if(!aligned_face_edges(num_face_edges-1, num_face_edges-2, faces[face_ind]) ){
-
-      // To remove the triangle with the vertices of the last two edges
-      // one must be sure that the remaining face does not become degenerate.
-
-      if(!aligned_face_edges(0, num_face_edges-3, faces[face_ind]) ){
-
-        triangle_detach(face_ind);
-        num_face_edges--;
-      }
+  uint64_t num_face_edges = faces[face_ind].edges.size();
+  
+  while (num_face_edges > 3) {
+      if (triangle_detach(face_ind)) num_face_edges--;
       else UINT64_vect_down_shift(faces[face_ind].edges, 1);
-
-    }
-    else UINT64_vect_down_shift(faces[face_ind].edges, 1);
-
   }
+
+  //while(num_face_edges > 3){
+
+  //  // Check if last two edges are not-aligned.
+  //  if(!aligned_face_edges(num_face_edges-1, num_face_edges-2, faces[face_ind]) ){
+
+  //    // To remove the triangle with the vertices of the last two edges
+  //    // one must be sure that the remaining face does not become degenerate.
+  //    
+  //    if(!aligned_face_edges(0, num_face_edges-3, faces[face_ind]) ){
+
+  //      triangle_detach(face_ind);
+  //      num_face_edges--;
+  //    }
+  //    else UINT64_vect_down_shift(faces[face_ind].edges, 1);
+
+  //  }
+  //  else UINT64_vect_down_shift(faces[face_ind].edges, 1);
+
+  //}
 }
 
 //  Input: vertices indices of a BSPelement: vrts.
@@ -2127,11 +2139,38 @@ void BSPcomplex::computeBaricenter(const vector<uint32_t>& vrts){
             sum_y += cy;
             sum_z += cz;
             np++;
-            break; // This line should be commented to have an actual barycenter !!!!!!
+            //break; // This line should be commented to have an actual barycenter !!!!!!
         }
 
     vertices.push_back(new explicitPoint3D(sum_x / np, sum_y / np, sum_z / np));
     vrts_visit.push_back(0);
+}
+
+genericPoint* BSPcomplex::createExactBarycenter(const vector<uint32_t>& vrts) {
+    //
+    // 1) Pick two vertices
+    // 2) Pick a third vertex which is not aligned with the first two
+    // 3) Pick a fourth vertex whose o3d with the other three is not zero
+    // 4) Compute their (exact) barycenter
+    //
+    uint32_t vi[4] = { vrts[0], vrts[1], UINT32_MAX, UINT32_MAX };
+    const genericPoint* av[4];
+    av[0] = vertices[vi[0]];
+    av[1] = vertices[vi[1]];
+    size_t i = 2;
+    for (; i < vrts.size(); i++) if (genericPoint::misaligned(*av[0], *av[1], *vertices[vrts[i]])) { vi[2] = vrts[i]; break; }
+    av[2] = vertices[vi[2]];
+    for (i++; i < vrts.size(); i++) if (genericPoint::orient3D(*av[0], *av[1], *av[2], *vertices[vrts[i]]) != 0) { vi[3] = vrts[i]; break; }
+    av[3] = vertices[vi[3]];
+
+    //std::cout << *av[0] << "\n";
+    //std::cout << *av[1] << "\n";
+    //std::cout << *av[2] << "\n";
+    //std::cout << *av[3] << "\n";
+    //std::cout << implicitPoint3D_TBC(*av[0], *av[1], *av[2], *av[3]) << "\n";
+    //getchar();
+
+    return new implicitPoint3D_TBC(*av[0], *av[1], *av[2], *av[3]);
 }
 
 //
@@ -2240,7 +2279,12 @@ void BSPcomplex::makeTetrahedra()
 
           if(needs_barycenter){ // Cell need baricenter
             decomposition_type[cell_i] = 2;
-            computeBaricenter(cell_vrts);
+
+            genericPoint* bp = createExactBarycenter(cell_vrts);
+            vertices.push_back(bp);
+            vrts_visit.push_back(0);
+            
+            //computeBaricenter(cell_vrts);
             decomposition_vrt[cell_i] = ((uint32_t)vertices.size() - 1);
             tet_num += cell.faces.size();
           }
@@ -2259,7 +2303,7 @@ void BSPcomplex::makeTetrahedra()
         vector<uint32_t> cell_vrts(4, UINT32_MAX);
         list_cellVertices(cells[cell_i], 6, cell_vrts);
         final_tets.insert(final_tets.end(), cell_vrts.begin(), cell_vrts.end());
-      }
+       }
       else if(decomposition_type[cell_i] == 1){ // Tetrahedralizable from vertex
         uint32_t v = decomposition_vrt[cell_i];
         uint64_t num_incFaces = count_cellFaces_inc_cellVrt(cells[cell_i], v);
@@ -2285,6 +2329,15 @@ void BSPcomplex::makeTetrahedra()
       }
     }
 
+    // Make sure that all tets have a positive orientation
+    for (uint32_t t = 0; t < final_tets.size(); t += 4) {
+        if (genericPoint::orient3D(
+            *vertices[final_tets[t]], 
+            *vertices[final_tets[t + 1]], 
+            *vertices[final_tets[t + 2]],
+            *vertices[final_tets[t + 3]]) < 0
+           ) std::swap(final_tets[t], final_tets[t + 1]);
+    }
 }
 
 

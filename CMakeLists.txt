@@ -61,18 +61,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	elseif(ENABLE_SSE2)
 		target_compile_options(${PROJECT_NAME} PUBLIC "/arch:SSE2")
 	endif()
-# reserve enough stack size
-	target_link_options(${TARGET} PUBLIC "/STACK:8421376")
 else()
 # set standard optimization level
 	target_compile_options(${TARGET} PUBLIC -O2)
 # grant IEEE 754 compliance
 	target_compile_options(${TARGET} PUBLIC -frounding-math)
-# reserve enough stack size	
-	target_compile_options(${TARGET} PUBLIC -Wl,-z,stacksize=8421376)
 	# set target architecture
 	if(ENABLE_AVX2)
 		target_compile_options(${PROJECT_NAME} PUBLIC "-mavx2")
+		target_compile_options(${PROJECT_NAME} PUBLIC "-mfma")
 	elseif(ENABLE_SSE2)
 		target_compile_options(${PROJECT_NAME} PUBLIC "-msse2")
 	endif()

@@ -249,6 +249,16 @@ class BSPcomplex{
                                 vector<uint64_t>& v_NOT_incFaces_ind);
     bool is_virtual(uint32_t constr_ind);
 
+    // Return 1 if p is in the interior of the cell, 0 if it is on its border, -1 if it is outside
+    int pointInCell() const {
+        // For each face, 
+        //  check o3d of all cell vertices (excluding those of the face itself)
+        //  and stop as soon as one of them is != 0 (normally, it should be the first)
+        //  check o3d of p. If zero -> return zero
+        //  if sign opposite wrt cell vertex o3d -> return -1
+        // Return 1
+    }
+
     uint64_t getOppositeEdgeFace(const uint64_t e0, const uint64_t f0, const uint64_t c);
     void makeEFrelation(const uint64_t e_id, std::vector<uint64_t>& ef);
 
@@ -318,9 +328,10 @@ class BSPcomplex{
     void markInternalCells(uint32_t skin_colour, uint32_t internal_label, const std::vector<double>& face_costs);
 
     // Tetrahedralization
-    void triangle_detach(uint64_t face_ind);
+    bool triangle_detach(uint64_t face_ind);
     bool aligned_face_edges(uint64_t fe0, uint64_t fe1, const BSPface& face);
     void triangulateFace(uint64_t face_ind);
+    genericPoint *createExactBarycenter(const vector<uint32_t>& vrts);
     void computeBaricenter(const vector<uint32_t>& vrts);
     inline uint64_t triFace_oppEdge(const BSPface& face, uint32_t v);
     uint64_t triFace_shareEdge(const BSPcell& cell, uint64_t face_ind,

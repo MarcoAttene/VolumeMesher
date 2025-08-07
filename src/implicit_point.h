@@ -31,6 +31,8 @@
 #include "numerics.h"
 #include <iostream>
 
+#define CASCADED_IMPLICIT_POINTS
+
 // An indirect predicate can assume one of the following values.
 // UNDEFINED means that input parameters are degenerate and do not define an
 // implicit point.
@@ -51,11 +53,14 @@ enum Filtered_Sign {
 enum Point_Type {
 	UNDEF = 0,
 	EXPLICIT2D = 1,
-	SSI = 2, // This must be the last 2D config in this ordered list
+	SSI = 2, // Segment-segment intersection
+	// This must be the last 2D config in this ordered list
 	EXPLICIT3D = 3,
-	LPI = 4, // Line-plane intersection
-	TPI = 5, // Three-planes intersection
-	LNC = 6  // Linear combination
+	LPI = 4, // Line-Plane Intersection
+	TPI = 5, // Three-Planes Intersection
+	LNC = 6,  // LiNear Combination
+	BPT = 7,  // Barycentric Point in Triangle
+	TBC = 8   // Tetrahedron's BaryCenter
 };
 
 // This is a generic point. It can be extended as either explicit or implicit point
@@ -75,6 +80,8 @@ public:
 	bool isLPI() const { return (type == LPI); }
 	bool isTPI() const { return (type == TPI); }
 	bool isLNC() const { return (type == LNC); }
+	bool isBPT() const { return (type == BPT); }
+	bool isTBC() const { return (type == TBC); }
 
 	// The following functions convert to explicit points.
 	// Use only after having verified the correct type through getType()
@@ -93,6 +100,8 @@ public:
 	class implicitPoint3D_LPI& toLPI() { return (implicitPoint3D_LPI&)(*this); }
 	class implicitPoint3D_TPI& toTPI() { return (implicitPoint3D_TPI&)(*this); }
 	class implicitPoint3D_LNC& toLNC() { return (implicitPoint3D_LNC&)(*this); }
+	class implicitPoint3D_BPT& toBPT() { return (implicitPoint3D_BPT&)(*this); }
+	class implicitPoint3D_TBC& toTBC() { return (implicitPoint3D_TBC&)(*this); }
 
 	const class explicitPoint2D& toExplicit2D() const { return (explicitPoint2D&)(*this); }
 	const class implicitPoint2D_SSI& toSSI() const { return (implicitPoint2D_SSI&)(*this); }
@@ -100,6 +109,8 @@ public:
 	const class implicitPoint3D_LPI& toLPI() const { return (implicitPoint3D_LPI&)(*this); }
 	const class implicitPoint3D_TPI& toTPI() const { return (implicitPoint3D_TPI&)(*this); }
 	const class implicitPoint3D_LNC& toLNC() const { return (implicitPoint3D_LNC&)(*this); }
+	const class implicitPoint3D_BPT& toBPT() const { return (implicitPoint3D_BPT&)(*this); }
+	const class implicitPoint3D_TBC& toTBC() const { return (implicitPoint3D_TBC&)(*this); }
 
 	// Calculates the first two cartesian coordinates. If the point is implicit, these
 	// coordinates are approximated due to floating point roundoff.
@@ -146,6 +157,10 @@ public:
 	// InSphere - fully supported
 	// Input can be any combination of 3D points
 	static int inSphere(const genericPoint& a, const genericPoint& b, const genericPoint& c, const genericPoint& d, const genericPoint& e);
+
+	// InGabrielSphere - fully supported (<0 if q is in the diemetral sphere by a,b,c)
+	// Input can be any combination of 3D points
+	static int inGabrielSphere(const genericPoint& q, const genericPoint& a, const genericPoint& b, const genericPoint& c);
 
 	// incircle - fully supported
 	// Input can be any combination of 2D points
@@ -267,11 +282,18 @@ public:
 
 
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& d) const;
-	void getExactLambda(double** lx, int& lxl, double** ly, int& lyl, double** d, int& dl) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& d) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& d) const;
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number& d) const;
-	void getExactLambda(double** lx, int& lxl, double** ly, int& lyl, double** lz, int& lzl, double** d, int& dl) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
+
+	bool getLambda2D(interval_number& lx, interval_number& ly, interval_number& d) const { return getIntervalLambda(lx, ly, d); }
+	bool getLambda3D(interval_number& lx, interval_number& ly, interval_number& lz, interval_number& d) const { return getIntervalLambda(lx, ly, lz, d); }
+	bool getLambda2D(bigfloat& lx, bigfloat& ly, bigfloat& d) const { getBigfloatLambda(lx, ly, d); return true; }
+	bool getLambda3D(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const { getBigfloatLambda(lx, ly, lz, d); return true; }
+	bool getLambda2D(expansion& lx, expansion& ly, expansion& d) const { getExpansionLambda(lx, ly, d); return true; }
+	bool getLambda3D(expansion& lx, expansion& ly, expansion& lz, expansion& d) const { getExpansionLambda(lx, ly, lz, d); return true; }
 };
 
 
@@ -302,18 +324,24 @@ public:
 };
 
 
+#ifdef CASCADED_IMPLICIT_POINTS
+typedef genericPoint	basePointType2D;
+#else
+typedef explicitPoint2D	basePointType2D;
+#endif
+
 // Implicit 2D point defined by the intersection of two lines l1 and l2
 class implicitPoint2D_SSI : public genericPoint{
-	const explicitPoint2D &l1_1, &l1_2, &l2_1, &l2_2;
+	const genericPoint &l1_1, &l1_2, &l2_1, &l2_2;
 
 public:
-	implicitPoint2D_SSI(const explicitPoint2D& l11, const explicitPoint2D& l12,
-		const explicitPoint2D& l21, const explicitPoint2D& l22);
+	implicitPoint2D_SSI(const genericPoint& l11, const genericPoint& l12,
+		const genericPoint& l21, const genericPoint& l22);
 
-	const explicitPoint2D& L1_1() const { return l1_1; }
-	const explicitPoint2D& L1_2() const { return l1_2; }
-	const explicitPoint2D& L2_1() const { return l2_1; }
-	const explicitPoint2D& L2_2() const { return l2_2; }
+	const basePointType2D& L1_1() const { return l1_1.toExplicit2D(); }
+	const basePointType2D& L1_2() const { return l1_2.toExplicit2D(); }
+	const basePointType2D& L2_1() const { return l2_1.toExplicit2D(); }
+	const basePointType2D& L2_2() const { return l2_2.toExplicit2D(); }
 
 private: // Cached values
 	mutable interval_number dfilter_lambda_x, dfilter_lambda_y, dfilter_denominator;
@@ -321,7 +349,7 @@ private: // Cached values
 
 public:
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number &d) const;
-	void getExactLambda(double **lx, int& lxl, double **ly, int& lyl, double **d, int& dl) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& d) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& d) const;
 	bool getExactXYCoordinates(bigrational& x, bigrational& y) const;
 };
@@ -354,27 +382,34 @@ public:
 	bool getExactXYZCoordinates(bigrational& _x, bigrational& _y, bigrational& _z) const { _x = bigfloat(x); _y = bigfloat(y); _z = bigfloat(z); return true; }
 };
 
+
+#ifdef CASCADED_IMPLICIT_POINTS
+typedef genericPoint	basePointType3D;
+#else
+typedef explicitPoint3D	basePointType3D;
+#endif
+
 // Implicit point defined by the intersection of a line and a plane
 class implicitPoint3D_LPI : public genericPoint{
-	const explicitPoint3D &ip, &iq; // The line
-	const explicitPoint3D &ir, &is, &it; // The plane
+	const genericPoint&ip, &iq; // The line
+	const genericPoint&ir, &is, &it; // The plane
 
 public:
-	implicitPoint3D_LPI(const explicitPoint3D& _p, const explicitPoint3D& _q,
-		const explicitPoint3D& _r, const explicitPoint3D& _s, const explicitPoint3D& _t);
+	implicitPoint3D_LPI(const genericPoint& _p, const genericPoint& _q,
+		const genericPoint& _r, const genericPoint& _s, const genericPoint& _t);
 
-	const explicitPoint3D& P() const { return ip; }
-	const explicitPoint3D& Q() const { return iq; }
-	const explicitPoint3D& R() const { return ir; }
-	const explicitPoint3D& S() const { return is; }
-	const explicitPoint3D& T() const { return it; }
+	const basePointType3D& P() const { return ip.toExplicit3D(); }
+	const basePointType3D& Q() const { return iq.toExplicit3D(); }
+	const basePointType3D& R() const { return ir.toExplicit3D(); }
+	const basePointType3D& S() const { return is.toExplicit3D(); }
+	const basePointType3D& T() const { return it.toExplicit3D(); }
 
 private: // Cached values
 	interval_number dfilter_lambda_x, dfilter_lambda_y, dfilter_lambda_z, dfilter_denominator;
 
 public:
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number &d) const;
-	void getExactLambda(double **lx, int& lxl, double **ly, int& lyl, double **lz, int& lzl, double **d, int& dl) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
 	bool getExactXYZCoordinates(bigrational& x, bigrational& y, bigrational& z) const;
 };
@@ -382,31 +417,31 @@ public:
 
 // Implicit point defined by the intersection of three planes
 class implicitPoint3D_TPI : public genericPoint{
-	const explicitPoint3D &iv1, &iv2, &iv3; // Plane 1
-	const explicitPoint3D &iw1, &iw2, &iw3; // Plane 2
-	const explicitPoint3D &iu1, &iu2, &iu3; // Plane 3
+	const genericPoint&iv1, &iv2, &iv3; // Plane 1
+	const genericPoint&iw1, &iw2, &iw3; // Plane 2
+	const genericPoint&iu1, &iu2, &iu3; // Plane 3
 
 public:
-	implicitPoint3D_TPI(const explicitPoint3D& _v1, const explicitPoint3D& _v2, const explicitPoint3D& _v3,
-		const explicitPoint3D& _w1, const explicitPoint3D& _w2, const explicitPoint3D& _w3,
-		const explicitPoint3D& _u1, const explicitPoint3D& _u2, const explicitPoint3D& _u3);
+	implicitPoint3D_TPI(const genericPoint& _v1, const genericPoint& _v2, const genericPoint& _v3,
+		const genericPoint& _w1, const genericPoint& _w2, const genericPoint& _w3,
+		const genericPoint& _u1, const genericPoint& _u2, const genericPoint& _u3);
 
-	const explicitPoint3D& V1() const { return iv1; }
-	const explicitPoint3D& V2() const { return iv2; }
-	const explicitPoint3D& V3() const { return iv3; }
-	const explicitPoint3D& W1() const { return iw1; }
-	const explicitPoint3D& W2() const { return iw2; }
-	const explicitPoint3D& W3() const { return iw3; }
-	const explicitPoint3D& U1() const { return iu1; }
-	const explicitPoint3D& U2() const { return iu2; }
-	const explicitPoint3D& U3() const { return iu3; }
+	const basePointType3D& V1() const { return iv1.toExplicit3D(); }
+	const basePointType3D& V2() const { return iv2.toExplicit3D(); }
+	const basePointType3D& V3() const { return iv3.toExplicit3D(); }
+	const basePointType3D& W1() const { return iw1.toExplicit3D(); }
+	const basePointType3D& W2() const { return iw2.toExplicit3D(); }
+	const basePointType3D& W3() const { return iw3.toExplicit3D(); }
+	const basePointType3D& U1() const { return iu1.toExplicit3D(); }
+	const basePointType3D& U2() const { return iu2.toExplicit3D(); }
+	const basePointType3D& U3() const { return iu3.toExplicit3D(); }
 
 private: // Cached values
 	interval_number dfilter_lambda_x, dfilter_lambda_y, dfilter_lambda_z, dfilter_denominator;
 
 public:
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number &d) const;
-	void getExactLambda(double **lx, int& lxl, double **ly, int& lyl, double **lz, int& lzl, double **d, int& dl) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
 	bool getExactXYZCoordinates(bigrational& x, bigrational& y, bigrational& z) const;
 };
@@ -414,15 +449,15 @@ public:
 
 // Implicit point defined as a linear combination of two points
 class implicitPoint3D_LNC : public genericPoint {
-	const explicitPoint3D& ip, & iq; // The two points
+	const genericPoint& ip, & iq; // The two points
 	const double t; // The parameter (0 = ip, 1 = iq)
 
 public:
-	implicitPoint3D_LNC(const explicitPoint3D& _p, const explicitPoint3D& _q,
+	implicitPoint3D_LNC(const genericPoint& _p, const genericPoint& _q,
 		const double _t);
 
-	const explicitPoint3D& P() const { return ip; }
-	const explicitPoint3D& Q() const { return iq; }
+	const basePointType3D& P() const { return ip.toExplicit3D(); }
+	const basePointType3D& Q() const { return iq.toExplicit3D(); }
 	const double T() const { return t; }
 
 private: // Cached values
@@ -430,7 +465,56 @@ private: // Cached values
 
 public:
 	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number& d) const;
-	void getExactLambda(double** lx, int& lxl, double** ly, int& lyl, double** lz, int& lzl, double** d, int& dl) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
+	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
+	bool getExactXYZCoordinates(bigrational& x, bigrational& y, bigrational& z) const;
+};
+
+
+// Implicit point defined as a linear combination of three points
+class implicitPoint3D_BPT : public genericPoint {
+	const genericPoint& ip, & iq, & ir; // The three points
+	const double v, u; // The two weights. Position = ip*v + iq*u + ir*(1-u-v)
+
+public:
+	implicitPoint3D_BPT(const genericPoint& _p, const genericPoint& _q, const genericPoint& _r,
+		const double _v, const double _u);
+
+	const basePointType3D& P() const { return ip.toExplicit3D(); }
+	const basePointType3D& Q() const { return iq.toExplicit3D(); }
+	const basePointType3D& R() const { return ir.toExplicit3D(); }
+	const double U() const { return u; }
+	const double V() const { return v; }
+
+private: // Cached values
+	interval_number dfilter_lambda_x, dfilter_lambda_y, dfilter_lambda_z, dfilter_denominator;
+
+public:
+	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number& d) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
+	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
+	bool getExactXYZCoordinates(bigrational& x, bigrational& y, bigrational& z) const;
+};
+
+
+// Implicit point defined as a linear combination of three points
+class implicitPoint3D_TBC : public genericPoint {
+	const genericPoint& ip, & iq, & ir, & is; // The four points
+
+public:
+	implicitPoint3D_TBC(const genericPoint& _p, const genericPoint& _q, const genericPoint& _r, const genericPoint& _s);
+
+	const basePointType3D& P() const { return ip.toExplicit3D(); }
+	const basePointType3D& Q() const { return iq.toExplicit3D(); }
+	const basePointType3D& R() const { return ir.toExplicit3D(); }
+	const basePointType3D& S() const { return is.toExplicit3D(); }
+
+private: // Cached values
+	interval_number dfilter_lambda_x, dfilter_lambda_y, dfilter_lambda_z, dfilter_denominator;
+
+public:
+	bool getIntervalLambda(interval_number& lx, interval_number& ly, interval_number& lz, interval_number& d) const;
+	void getExpansionLambda(expansion& lx, expansion& ly, expansion& lz, expansion& d) const;
 	void getBigfloatLambda(bigfloat& lx, bigfloat& ly, bigfloat& lz, bigfloat& d) const;
 	bool getExactXYZCoordinates(bigrational& x, bigrational& y, bigrational& z) const;
 };
@@ -482,6 +566,20 @@ inline ostream& operator<<(ostream& os, const implicitPoint3D_LNC& p)
 	explicitPoint3D e;
 	if (p.apapExplicit(e)) return os << e;
 	else return os << "UNDEF_LNC";
+}
+
+inline ostream& operator<<(ostream& os, const implicitPoint3D_BPT& p)
+{
+	explicitPoint3D e;
+	if (p.apapExplicit(e)) return os << e;
+	else return os << "UNDEF_BPT";
+}
+
+inline ostream& operator<<(ostream& os, const implicitPoint3D_TBC& p)
+{
+	explicitPoint3D e;
+	if (p.apapExplicit(e)) return os << e;
+	else return os << "UNDEF_TBC";
 }
 
 #include "hand_optimized_predicates.hpp"

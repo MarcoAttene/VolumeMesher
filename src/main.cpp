@@ -57,7 +57,7 @@ void read_OFF_file(const char* filename,
 /// <returns></returns>
 int main(int argc, char** argv)
 {
-#ifndef DEBUG
+#ifdef NDEBUG
     if (argc < 2) {
         printf("\nUsage: mesh_generator [-v | -l | -s | -b | -t] inputfile_A.off [bool_opcode inputfile_B.off]\n\n"
             "Defines the volume enclosed by the input OFF file(s) and saves a volume mesh to 'volume.msh'\n\n"
@@ -120,21 +120,21 @@ int main(int argc, char** argv)
         }
     }
 #else
-    bool triangulate = false;
+    bool triangulate = true;
     bool verbose = true;
     bool logging = false;
     bool surfmesh = false;
     bool blackfaces = false;
-    char* fileA_name = "whatsoever";
+    const char* fileA_name = "D:\\SYNC_DATA\\Sviluppo_Software\\My_Software\\GIT_REPOS\\TetMeshes\\Input_file\\100070.off";
     char* fileB_name = NULL;
     char bool_opcode = '0';
     bool two_input = (bool_opcode != '0');
 #endif
 
     double* coords_A, * coords_B = NULL;
-    uint32_t ncoords_A, ncoords_B;
-    uint32_t* tri_idx_A, * tri_idx_B;
-    uint32_t ntriidx_A, ntriidx_B;
+    uint32_t ncoords_A, ncoords_B=0;
+    uint32_t* tri_idx_A, * tri_idx_B=NULL;
+    uint32_t ntriidx_A, ntriidx_B=0;
 
     read_OFF_file(fileA_name, &coords_A, &ncoords_A, &tri_idx_A, &ntriidx_A, verbose);
     if (two_input) read_OFF_file(fileB_name, &coords_B, &ncoords_B, &tri_idx_B, &ntriidx_B, verbose);
