@@ -339,6 +339,7 @@ static inline uint32_t tet_faceID(uint32_t v0, uint32_t v1, uint32_t v2,
     if(v[3] != v0 && v[3] != v1 && v[3] != v2 ) return 3;
 
     ip_error("tet_faceID: FATAL ERROR no faces of tet correspond to vertices.\n");
+    return UINT32_MAX;
 }
 
 //  Input: trinagle <v0,v1,v2>,

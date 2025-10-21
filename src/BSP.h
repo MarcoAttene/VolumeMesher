@@ -250,14 +250,14 @@ class BSPcomplex{
     bool is_virtual(uint32_t constr_ind);
 
     // Return 1 if p is in the interior of the cell, 0 if it is on its border, -1 if it is outside
-    int pointInCell() const {
-        // For each face, 
-        //  check o3d of all cell vertices (excluding those of the face itself)
-        //  and stop as soon as one of them is != 0 (normally, it should be the first)
-        //  check o3d of p. If zero -> return zero
-        //  if sign opposite wrt cell vertex o3d -> return -1
-        // Return 1
-    }
+    // int pointInCell() const {
+    //     // For each face, 
+    //     //  check o3d of all cell vertices (excluding those of the face itself)
+    //     //  and stop as soon as one of them is != 0 (normally, it should be the first)
+    //     //  check o3d of p. If zero -> return zero
+    //     //  if sign opposite wrt cell vertex o3d -> return -1
+    //     // Return 1
+    // }
 
     uint64_t getOppositeEdgeFace(const uint64_t e0, const uint64_t f0, const uint64_t c);
     void makeEFrelation(const uint64_t e_id, std::vector<uint64_t>& ef);
