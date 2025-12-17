@@ -11,9 +11,8 @@ set(ENABLE_AVX2 True)
 #####################
 
 # use gcc and g++ instead of clang
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-set(CMAKE_CXX_COMPILER "g++-10")
-endif()
+set(CMAKE_CXX_COMPILER "g++-12")
+set(CMAKE_C_COMPILER "gcc-12")
 
 # set the project name
 project(mesh_generator)
