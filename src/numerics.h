@@ -251,6 +251,9 @@ protected:
 // An interval_number is a pair of doubles representing an interval.
 // Operations on interval_number require that the rounding mode is
 // set to +INFINITY. Use setFPUModeToRoundUP().
+//
+// All the four arithmetic operations and the square root are correctly
+// rounded.
 
 class interval_number
 {
@@ -285,6 +288,7 @@ public:
 	interval_number operator+(const interval_number& b) const;
 	interval_number operator-(const interval_number& b) const;
 	interval_number operator*(const interval_number& b) const;
+	interval_number operator/(const interval_number& b) const;
 	interval_number operator+(const double b) const;
 	interval_number operator-(const double b) const;
 	interval_number operator*(const double b) const;
@@ -292,6 +296,7 @@ public:
 	interval_number& operator+=(const interval_number& b);
 	interval_number& operator-=(const interval_number& b);
 	interval_number& operator*=(const interval_number& b);
+	interval_number& operator/=(const interval_number& b);
 	interval_number& operator+=(const double b);
 	interval_number& operator-=(const double b);
 	interval_number& operator*=(const double b);
@@ -342,6 +347,9 @@ public:
 
 	// The inverse of an interval. Returns NAN if the interval contains zero
 	interval_number inverse() const;
+
+	// A scalar divided by an interval. Returns NAN if the interval contains zero
+	interval_number invmul(const double b) const;
 
 #ifdef USE_SIMD_INSTRUCTIONS
 	interval_number(const __m128d& i);
@@ -1258,6 +1266,7 @@ inline interval_number interval_number::operator-(const double b) const { return
 inline interval_number& interval_number::operator+=(const interval_number& b) { return operator=(*this + b); }
 inline interval_number& interval_number::operator-=(const interval_number& b) { return operator=(*this - b); }
 inline interval_number& interval_number::operator*=(const interval_number& b) { return operator=(*this * b); }
+inline interval_number& interval_number::operator/=(const interval_number& b) { return operator=(*this / b); }
 inline interval_number& interval_number::operator+=(const double b) { return operator=(*this + b); }
 inline interval_number& interval_number::operator-=(const double b) { return operator=(*this - b); }
 inline interval_number& interval_number::operator*=(const double b) { return operator=(*this * b); }
@@ -1304,6 +1313,36 @@ inline interval_number interval_number::operator*(const interval_number& b) cons
 	return _mm256_castpd256_pd128(x3);
 }
 
+inline interval_number interval_number::operator/(const interval_number& b) const
+{
+	if (!b.signIsReliable()) return NAN;
+
+	// This version exploits 256bit registers provided by AVX2 architectures
+	// to compute the product using the "naive" eight-multiplications method.
+	// The advantage wrt to the non-avx version is due to the absence of
+	// branches in the execution, which increses the processor's throughput.
+
+	// Fill i1 and i2 with two copies of 'this' and 'b' respectively
+	__m256d i1 = _mm256_castpd128_pd256(interval);
+	i1 = _mm256_insertf128_pd(i1, interval, 1);
+	__m256d i2 = _mm256_castpd128_pd256(b.interval);
+	i2 = _mm256_insertf128_pd(i2, b.interval, 1);
+
+	// Swizzle and change sign appropriately to produce all the eight configs
+	__m256d x2 = _mm256_shuffle_pd(i1, i1, 5);
+	__m256d x3 = _mm256_xor_pd(i2, _mm256_set_pd(-0.0, -0.0, 0.0, 0.0));
+	__m256d x4 = _mm256_xor_pd(i2, _mm256_set_pd(0.0, 0.0, -0.0, -0.0));
+	x3 = _mm256_div_pd(i1, x3);
+	x2 = _mm256_div_pd(x2, x4);
+	x3 = _mm256_max_pd(x3, x2);
+	x4 = _mm256_shuffle_pd(x3, x3, 5);
+	x3 = _mm256_max_pd(x3, x4);
+	x3 = _mm256_permute4x64_pd(x3, 72);
+
+	// The first two vals of the 256 vector are the resulting product
+	return _mm256_castpd256_pd128(x3);
+}
+
 inline interval_number interval_number::fmadd(const interval_number& b, const interval_number& c) const
 {
 	// Fill i1 and i2 with two copies of 'this' and 'b' respectively
@@ -1341,6 +1380,17 @@ inline interval_number interval_number::operator*(const interval_number& b) cons
 	__m128d ssg;
 	__m128d llhh, lhhl, ip;
 
+	// cfg	(min_low, high)		(low, high)
+	// 0	++ ++				-+ -+
+	// 1	++ +-				-+ --
+	// 2	++ -+				++ -+
+	// 4	+- ++				-- -+
+	// 5	+- +-				-- --
+	// 6	+- -+				-- ++
+	// 8	-+ ++				++ -+
+	// 9	-+ +-				++ --
+	// 10	-+ -+				++ ++
+
 	switch ((_mm_movemask_pd(interval) << 2) | _mm_movemask_pd(b.interval))
 	{
 	case 0: // -+ * -+: <min(<a0*b1>,<a1*b0>), max(<a0*b0>,<a1*b1>)>
@@ -1370,6 +1420,44 @@ inline interval_number interval_number::operator*(const interval_number& b) cons
 
 	return interval_number(NAN);
 }
+
+inline interval_number interval_number::operator/(const interval_number& b) const
+{
+	if (!b.signIsReliable()) return NAN;
+
+	// <a0,a1> * <b0,b1>
+	__m128d ssg;
+	__m128d llhh, lhhl, ip;
+
+	// cfg	(min_low, high)		(low, high)
+	// 1	++ +-				-+ --
+	// 5	+- +-				-- --
+	// 6	+- -+				-- ++
+	// 9	-+ +-				++ --
+	// 10	-+ -+				++ ++
+
+	switch ((_mm_movemask_pd(interval) << 2) | _mm_movemask_pd(b.interval))
+	{
+	case 1: // -+ * --: <b0*a1, b0*a0>
+		return interval_number(_mm_div_pd(_mm_shuffle_pd(b.interval, b.interval, 3), _mm_shuffle_pd(interval, interval, 1)));
+	case 2: // -+ * ++: <b1*a0, b1*a1>
+		return interval_number(_mm_div_pd(_mm_shuffle_pd(b.interval, b.interval, 0), interval));
+	case 5: // -- * --: <a1*b1, a0*b0>
+		ip = _mm_div_pd(_mm_xor_pd(interval, sign_high_mask()), b.interval);
+		return interval_number(_mm_shuffle_pd(ip, ip, 1));
+	case 6: // -- * ++: <a0*b1, a1*b0>
+		ssg = _mm_xor_pd(b.interval, sign_low_mask());
+		return interval_number(_mm_div_pd(interval, _mm_shuffle_pd(ssg, ssg, 1)));
+	case 9: // ++ * --: <b0*a1, b1*a0>
+		ssg = _mm_xor_pd(interval, sign_low_mask());
+		return interval_number(_mm_div_pd(b.interval, _mm_shuffle_pd(ssg, ssg, 1)));
+	case 10: // ++ * ++: <a0*b0, a1*b1>
+		return interval_number(_mm_div_pd(interval, _mm_xor_pd(b.interval, sign_low_mask())));
+	}
+
+	return interval_number(NAN);
+}
+
 #endif
 
 inline interval_number interval_number::operator*(const double b) const {
@@ -1423,6 +1511,14 @@ inline interval_number interval_number::inverse() const
 	{
 		return interval_number(NAN);
 	}
+}
+
+inline interval_number interval_number::invmul(const double b) const
+{
+	const int m = _mm_movemask_pd(interval);
+	if (m != 1 && m != 2) return interval_number(NAN);
+	if (b > 0) return interval_number(_mm_div_pd(_mm_set1_pd(-b), _mm_shuffle_pd(interval, interval, 1)));
+	else return interval_number(_mm_div_pd(_mm_set1_pd(b), interval));
 }
 
 inline interval_number interval_number::pow(unsigned int e) const {
@@ -1492,6 +1588,7 @@ inline interval_number interval_number::operator-(const double b) const { return
 inline interval_number& interval_number::operator+=(const interval_number& b) { min_low += b.min_low; high += b.high; return *this; }
 inline interval_number& interval_number::operator-=(const interval_number& b) { return operator=(*this - b); }
 inline interval_number& interval_number::operator*=(const interval_number& b) { return operator=(*this * b); }
+inline interval_number& interval_number::operator/=(const interval_number& b) { return operator=(*this / b); }
 inline interval_number& interval_number::operator+=(const double b) { min_low -= b; high += b; return *this; }
 inline interval_number& interval_number::operator-=(const double b) { min_low += b; high -= b; return *this; }
 inline interval_number& interval_number::operator*=(const double b) { return operator=(*this * b); }
@@ -1525,6 +1622,16 @@ inline interval_number interval_number::operator*(const interval_number& b) cons
 	casted_double l1(min_low), h1(high), l2(b.min_low), h2(b.high);
 	uint64_t cfg = (l1.is_negative() << 3) + (h1.is_negative() << 2) + (l2.is_negative() << 1) + (h2.is_negative());
 
+	// cfg	(min_low, high)		(low, high)
+	// 0	++ ++				-+ -+
+	// 1	++ +-				-+ --
+	// 2	++ -+				-+ ++
+	// 4	+- ++				-- -+
+	// 5	+- +-				-- --
+	// 6	+- -+				-- ++
+	// 8	-+ ++				++ -+
+	// 9	-+ +-				++ --
+	// 10	-+ -+				++ ++
 	switch (cfg)
 	{
 	case 10: return interval_number(min_low * (-b.min_low), high * b.high);
@@ -1541,6 +1648,42 @@ inline interval_number interval_number::operator*(const interval_number& b) cons
 	case 6: return interval_number(min_low * b.high, high * (-b.min_low));
 	case 4: return interval_number(min_low * b.high, min_low * b.min_low);
 	case 5: return interval_number((-high) * b.high, min_low * b.min_low);
+	};
+
+	return interval_number(NAN);
+}
+
+inline interval_number interval_number::operator/(const interval_number& b) const
+{
+	if (!b.signIsReliable()) return NAN;
+
+	typedef union error_approx_type_t
+	{
+		double d;
+		uint64_t u;
+
+		inline error_approx_type_t() {}
+		inline error_approx_type_t(double a) : d(a) {}
+		inline uint64_t is_negative() const { return u >> 63; }
+	} casted_double;
+
+	casted_double l1(min_low), h1(high), l2(b.min_low), h2(b.high);
+	uint64_t cfg = (l1.is_negative() << 3) + (h1.is_negative() << 2) + (l2.is_negative() << 1) + (h2.is_negative());
+
+	// cfg	(min_low, high)		(low, high)
+	// 1	++ +-				-+ --
+	// 5	+- +-				-- --
+	// 6	+- -+				-- ++
+	// 9	-+ +-				++ --
+	// 10	-+ -+				++ ++
+	switch (cfg)
+	{
+	case 10: return interval_number(min_low / (-b.min_low), high / b.high);
+	case 9: return interval_number(high / b.min_low, (-min_low) / b.high);
+	case 2: return interval_number(min_low / b.high, high / b.high);
+	case 1: return interval_number(high / b.min_low, min_low / b.min_low);
+	case 6: return interval_number(min_low / b.high, high / (-b.min_low));
+	case 5: return interval_number((-high) / b.high, min_low / b.min_low);
 	};
 
 	return interval_number(NAN);
@@ -1583,6 +1726,14 @@ inline interval_number interval_number::inverse() const
 	}
 }
 
+inline interval_number interval_number::invmul(const double b) const
+{
+	if (!signIsReliable()) return interval_number(NAN);
+	if (b > 0) return interval_number(-b / sup(), -b / minus_inf());
+	else return interval_number(b / minus_inf(), b / sup());
+}
+
+
 inline interval_number interval_number::pow(unsigned int e) const {
 
 	const double _uinf = fabs(min_low), _usup = fabs(high);
@@ -1611,15 +1762,13 @@ inline interval_number interval_number::pow(unsigned int e) const {
 }
 
 inline interval_number interval_number::pow2() const {
-	const double _fm = min_low * min_low, _fM = high * high;
-
-	if (_fm > _fM) {
-		if (min_low < 0 || high < 0) return interval_number(-_fM, _fm);
-		else return interval_number(0, _fm);
+	if (fabs(min_low) > fabs(high)) {
+		if (min_low < 0 || high < 0) return interval_number((-high) * (high), min_low * min_low);
+		else return interval_number(0, min_low * min_low);
 	}
 	else {
-		if (min_low < 0 || high < 0) return interval_number(-_fm, _fM);
-		else return interval_number(0, _fM);
+		if (min_low < 0 || high < 0) return interval_number((-min_low) * (min_low), high * high);
+		else return interval_number(0, high * high);
 	}
 }
 
@@ -1651,13 +1800,18 @@ inline bool interval_number::operator!=(const interval_number& b) const { return
 
 inline interval_number sqrt(const interval_number& p)
 {
+	// We assume IEEE754, therefore sqrt(double) is correctly rounded.
+	// We also assume that current rounding is towards +infinity.
+	// sqrt(sup) is correctly rounded but sqrt(inf) is rounded on the opposite side.
+	// Hence, we compute sqrt(inf) and check whether rounding takes place. If so, we
+	// shift to the previous representable number to invert the rounding as needed.
 	const double inf = p.inf();
 	const double sup = p.sup();
 	if (inf < 0 || sup < 0) return interval_number(NAN);
-	const double srinf = sqrt(inf);
+	double srinf = sqrt(inf);
 	const double srsup = sqrt(sup);
-	if (srinf * srinf > inf) return interval_number((-nextafter(srinf, 0)), srsup);
-	else return interval_number(-srinf, srsup);
+	if (srinf * srinf > inf) (*(((uint64_t*)(&srinf))))--; // This works because srinf is finite
+	return interval_number(-srinf, srsup);
 }
 
 

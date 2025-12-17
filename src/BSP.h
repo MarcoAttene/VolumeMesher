@@ -321,6 +321,9 @@ class BSPcomplex{
     void get_approx_faceBaricenterCoord(const BSPface& face, double* bar);
     bool is_baricenter_inFace(const BSPface& face,
                              const explicitPoint3D& face_center, int max_normComp);
+    
+    bool hasFaceCoordinates(uint64_t face_ind, double crds[9], double tolerance);
+
     COLOUR_T blackAB_or_white(uint64_t face_ind, bool two_input);
 
     // Interior-exterior constraint surface

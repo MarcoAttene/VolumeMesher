@@ -947,7 +947,6 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   vrts_visit.resize(vertices.size(), 0);
   edge_visit.resize(edges.size(), 0);
 
-
   // Verify that conn_cell[0] is below the face for every face
   //for (size_t fid = 0; fid < faces.size(); fid++)
   //    if (!faceHasCorrectOrientation(this, fid))
@@ -986,6 +985,7 @@ inline void BSPcomplex::move_face(uint64_t face_cell_ind, uint64_t cell_ind,
 // Output: nothing.
 inline void BSPcomplex::remove_constraint(uint32_t constr_cell_ind,
                                           uint64_t cell_ind){
+
   BSPcell& cell = cells[cell_ind];
   size_t last_ind = cell.constraints.size()-1;
   if(constr_cell_ind != last_ind)
@@ -1859,13 +1859,22 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
   // Extract the last contraint that intersect the cell and remove it from
   // the list. The cell will be splitted by that constraint.
   BSPcell& cell = cells[cell_ind];
-  uint32_t constr = cell.constraints.back();
+  auto& cts = cell.constraints;
+  uint32_t constr = cts.back();
+  cts.pop_back();
+
+  // Virtual constraints should be used only when non-virtual constraints are over
+  if (is_virtual(constr)) {
+      for (size_t i = 0; i < cts.size(); i++) if (!is_virtual(cts[i])) {
+          std::swap(cts[i], constr); 
+          break;
+      }
+  }
+
   uint32_t constr_ID = 3*constr;
   uint32_t c0 = constraints_vrts[constr_ID  ];
   uint32_t c1 = constraints_vrts[constr_ID+1];
   uint32_t c2 = constraints_vrts[constr_ID+2];
-
-  cell.constraints.pop_back();
 
   // Search for coplanar constraints.
   vector<uint32_t> coplanar_constr;
@@ -1895,13 +1904,12 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
 
   // CASE. NO SPLIT:
   // at least two cell_vrts_or are 0, the other (!=0) have the same signe.
-  if(vrtsUNDER==0 || vrtsOVER==0) return;
+  if (vrtsUNDER == 0 || vrtsOVER == 0) return;
 
   // (else) CASE. SPLIT-INTERIOR:
   // at least two cell_vrts_or have opposite signe.
 
   // Split cell edges whose endpoints have opposite cell_vrts_or signe.
-
   for(uint64_t e=0; e<cell_edges.size(); e++){
       BSPedge& edge = edges[cell_edges[e]];
       if(constraint_innerIntersects_edge(edge, cell_vrts)){
@@ -2422,124 +2430,207 @@ inline bool faceColour_matches_constrGroup(CONSTR_GROUP_T group, bool f_blackA, 
 
 //
 //
+
+bool sameCoordinates(double c1[3], double c2[3], double tol) {
+    return (fabs(c1[0] - c2[0]) < tol && fabs(c1[1] - c2[1]) < tol && fabs(c1[2] - c2[2]) < tol);
+}
+
+// TRUE if triangular face has coordinates crds (for debug purposes)
+bool BSPcomplex::hasFaceCoordinates(uint64_t face_ind, double crds[9], double tolerance) {
+    const BSPface& face = faces[face_ind];
+    vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+    list_faceVertices((BSPface&)face, face_vrts);
+    if (face_vrts.size() != 3) return false;
+
+    double v[3];
+
+    vertices[face_vrts[0]]->getApproxXYZCoordinates(v[0], v[1], v[2]);
+    if (!sameCoordinates(v, crds, tolerance) && !sameCoordinates(v, crds + 3, tolerance) && !sameCoordinates(v, crds + 6, tolerance)) return false;
+    vertices[face_vrts[1]]->getApproxXYZCoordinates(v[0], v[1], v[2]);
+    if (!sameCoordinates(v, crds, tolerance) && !sameCoordinates(v, crds + 3, tolerance) && !sameCoordinates(v, crds + 6, tolerance)) return false;
+    vertices[face_vrts[2]]->getApproxXYZCoordinates(v[0], v[1], v[2]);
+    if (!sameCoordinates(v, crds, tolerance) && !sameCoordinates(v, crds + 3, tolerance) && !sameCoordinates(v, crds + 6, tolerance)) return false;
+
+    return true;
+}
+
 COLOUR_T BSPcomplex::blackAB_or_white(uint64_t face_ind, bool two_input){
   const BSPface& face = faces[face_ind];
 
   // Get dominant normal component
   int xyz = face_dominant_normal_component(face);
 
-  // Calculate approximated face barycenter
-  double p[3];
-  get_approx_faceBaricenterCoord(face, p);
-  const explicitPoint3D face_center(p[0], p[1], p[2]);
 
-  // Needed only for two input case.
-  bool face_is_blackA = false;
-  bool face_is_blackB = false;
+  // NEW VERSION THAT TAKES ADVANTAGE OF THE POSSIBILITY TO CASCADE IMPLICIT POINTS IN IPV2.0
 
-  // Check whether the barycenter is indeed inside the face (might be not due to approximation)
-  if ( is_baricenter_inFace(face, face_center, xyz) ) // Barycenter is inside the face: just check that it is in one of the constraints too
-  {
-      for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
-          const uint32_t constr = face.coplanar_constraints[c];
-          const CONSTR_GROUP_T c_group = constraint_group[constr];
-
-          if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
-
-          const uint32_t constr_ID = 3 * constr;
-          const genericPoint* c0 = vertices[ constraints_vrts[constr_ID   ] ];
-          const genericPoint* c1 = vertices[ constraints_vrts[constr_ID +1] ];
-          const genericPoint* c2 = vertices[ constraints_vrts[constr_ID +2] ];
-
-          if (genericPoint::pointInTriangle(face_center, *c0, *c1, *c2, xyz)){
-
-            if(!two_input) return BLACK_A;
-
-            if(c_group == CONSTR_A)      face_is_blackA = true;
-            else if(c_group == CONSTR_B) face_is_blackB = true;
-            if(face_is_blackA && face_is_blackB) return BLACK_AB;
-          }
-      }
-
-      if(two_input){
-        if(face_is_blackA) return BLACK_A;
-        else if(face_is_blackB) return BLACK_B;
-      }
-
-      return WHITE;
+  // 1) The face is convex. Pick the first two vertices v1 and v2, and pick one other face
+  //    vertex v3 s.t. orient2d(v1,v2,v3,xyz) is not zero.
+  vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+  list_faceVertices((BSPface &)face, face_vrts);
+  genericPoint* v1, * v2, * v3;
+  v1 = vertices[face_vrts[0]], v2 = vertices[face_vrts[1]];
+  size_t i;
+  for (i = 2; i < face_vrts.size(); i++) {
+      v3 = vertices[face_vrts[i]];
+      if (genericPoint::orient2D(*v1, *v2, *v3, xyz) != 0) break;
   }
-  else // Barycenter is not inside the face: revert to slow version
-  {
-      const BSPedge& edge0 = edges[face.edges.back()];
-      const BSPedge& edge1 = edges[face.edges[0]];
-      uint32_t vid = consecEdges_common_endpt(edge0.vertices[0], edge0.vertices[1],
-                                              edge1.vertices[0], edge1.vertices[1]);
+  assert(i != face_vrts.size());
 
-      for (uint64_t e = 0; e < face.edges.size(); e++) {
-          const BSPedge& edge = edges[face.edges[e]];
-          if (vid == edge.vertices[0]) vid = edge.vertices[1];
-          else vid = edge.vertices[0];
+  // 2) Make a BPT out of v1,v2,v3 using 0.33, 0.33 for u,v. This point is guaranteed to be
+  //    in the interior of the face
+  implicitPoint3D_BPT bc(*v1, *v2, *v3, 0.33, 0.33);
 
-          uint32_t out_from_all = 0;
-          const genericPoint* face_pt = vertices[vid];
-          for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
-              const uint32_t constr = face.coplanar_constraints[c];
-              const CONSTR_GROUP_T c_group = constraint_group[constr];
+  // 3) Check whether one of the coplanar constraints contains the BPT (either inside or on
+  //    its boundary). If one constraint contains it, the face is black.
 
-              if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
+  bool face_is_blackA = false, face_is_blackB = false;
 
-              const uint32_t constr_ID = 3 * constr;
-              const uint32_t vid1 = constraints_vrts[constr_ID];
-              const uint32_t vid2 = constraints_vrts[constr_ID + 1];
-              const uint32_t vid3 = constraints_vrts[constr_ID + 2];
-              const genericPoint* c0 = vertices[vid1];
-              const genericPoint* c1 = vertices[vid2];
-              const genericPoint* c2 = vertices[vid3];
+  for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
+      const uint32_t constr = face.coplanar_constraints[c];
+      const CONSTR_GROUP_T c_group = constraint_group[constr];
 
-              if (vid == vid1 || vid == vid2 || vid == vid3) break; // point on boundary.
-              int lpt = localizedPointInTriangle(*face_pt, *c0, *c1, *c2, xyz);
-              // lpt = 1 -> point on boundary, lpt = 2 -> point in interior, otherwise lpt = 0.
+      if (two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB)) continue;
 
-              if (lpt == 2){
+      const uint32_t constr_ID = 3 * constr;
+      const genericPoint* c0 = vertices[constraints_vrts[constr_ID]];
+      const genericPoint* c1 = vertices[constraints_vrts[constr_ID + 1]];
+      const genericPoint* c2 = vertices[constraints_vrts[constr_ID + 2]];
 
-                if(!two_input) return BLACK_A;
+      if (genericPoint::pointInTriangle(bc, *c0, *c1, *c2, xyz)) {
 
-                if(c_group == CONSTR_A) face_is_blackA = true;
-                else if(c_group == CONSTR_B) face_is_blackB = true;
-                if(face_is_blackA && face_is_blackB) return BLACK_AB;
-              }
+          if (!two_input) return BLACK_A;
 
-              if (lpt)  break;
-
-              out_from_all++;
-          }
-          if (out_from_all == face.coplanar_constraints.size()) return WHITE;
+          if (c_group == CONSTR_A)      face_is_blackA = true;
+          else if (c_group == CONSTR_B) face_is_blackB = true;
+          if (face_is_blackA && face_is_blackB) return BLACK_AB;
       }
-
-      // All face vertices are on the boundary of some coplanar constraints.
-      for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
-
-          const uint32_t constr = face.coplanar_constraints[c];
-          const CONSTR_GROUP_T c_group = constraint_group[ constr ];
-          if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
-
-          const uint32_t *constraint = constraints_vrts.data() + 3*constr;
-          if (coplanar_constraint_innerIntersects_face(face.edges, constraint, xyz)){
-
-            if(!two_input) return BLACK_A;
-
-            if(c_group == CONSTR_A) face_is_blackA = true;
-            else if(c_group == CONSTR_B) face_is_blackB = true;
-            if(face_is_blackA && face_is_blackB) return BLACK_AB;
-
-          }
-      }
-
-      if(face_is_blackA) return BLACK_A;
-      else if(face_is_blackB) return BLACK_B;
-
-      return WHITE;
   }
+
+  if (two_input) {
+      if (face_is_blackA) return BLACK_A;
+      else if (face_is_blackB) return BLACK_B;
+  }
+
+  // 4) If no contraints contain the BPT, the face is white.
+  return WHITE;
+
+  // 
+  ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+  //// Calculate approximated face barycenter
+  //double p[3];
+  //get_approx_faceBaricenterCoord(face, p);
+  //const explicitPoint3D face_center(p[0], p[1], p[2]);
+  ////if (fabs(p[2] + 13.140400) < 1.0e-4) std::cout << face_center << "\n";
+
+  //// Needed only for two input case.
+  //bool face_is_blackA = false;
+  //bool face_is_blackB = false;
+
+  //// Check whether the barycenter is indeed inside the face (might be not due to approximation)
+  //if ( is_baricenter_inFace(face, face_center, xyz) ) // Barycenter is inside the face: just check that it is in one of the constraints too
+  //{
+  //    for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
+  //        const uint32_t constr = face.coplanar_constraints[c];
+  //        const CONSTR_GROUP_T c_group = constraint_group[constr];
+
+  //        if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
+
+  //        const uint32_t constr_ID = 3 * constr;
+  //        const genericPoint* c0 = vertices[ constraints_vrts[constr_ID   ] ];
+  //        const genericPoint* c1 = vertices[ constraints_vrts[constr_ID +1] ];
+  //        const genericPoint* c2 = vertices[ constraints_vrts[constr_ID +2] ];
+
+  //        if (genericPoint::pointInTriangle(face_center, *c0, *c1, *c2, xyz)){
+
+  //          if(!two_input) return BLACK_A;
+
+  //          if(c_group == CONSTR_A)      face_is_blackA = true;
+  //          else if(c_group == CONSTR_B) face_is_blackB = true;
+  //          if(face_is_blackA && face_is_blackB) return BLACK_AB;
+  //        }
+  //    }
+
+  //    if(two_input){
+  //      if(face_is_blackA) return BLACK_A;
+  //      else if(face_is_blackB) return BLACK_B;
+  //    }
+
+  //    return WHITE;
+  //}
+  //else // Barycenter is not inside the face: revert to slow version
+  //{
+  //    const BSPedge& edge0 = edges[face.edges.back()];
+  //    const BSPedge& edge1 = edges[face.edges[0]];
+  //    uint32_t vid = consecEdges_common_endpt(edge0.vertices[0], edge0.vertices[1],
+  //                                            edge1.vertices[0], edge1.vertices[1]);
+
+  //    for (uint64_t e = 0; e < face.edges.size(); e++) {
+  //        const BSPedge& edge = edges[face.edges[e]];
+  //        if (vid == edge.vertices[0]) vid = edge.vertices[1];
+  //        else vid = edge.vertices[0];
+
+  //        uint32_t out_from_all = 0;
+  //        const genericPoint* face_pt = vertices[vid];
+  //        for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
+  //            const uint32_t constr = face.coplanar_constraints[c];
+  //            const CONSTR_GROUP_T c_group = constraint_group[constr];
+
+  //            if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
+
+  //            const uint32_t constr_ID = 3 * constr;
+  //            const uint32_t vid1 = constraints_vrts[constr_ID];
+  //            const uint32_t vid2 = constraints_vrts[constr_ID + 1];
+  //            const uint32_t vid3 = constraints_vrts[constr_ID + 2];
+  //            const genericPoint* c0 = vertices[vid1];
+  //            const genericPoint* c1 = vertices[vid2];
+  //            const genericPoint* c2 = vertices[vid3];
+
+  //            if (vid == vid1 || vid == vid2 || vid == vid3) break; // point on boundary.
+  //            int lpt = localizedPointInTriangle(*face_pt, *c0, *c1, *c2, xyz);
+  //            // lpt = 1 -> point on boundary, lpt = 2 -> point in interior, otherwise lpt = 0.
+
+  //            if (lpt == 2){
+
+  //              if(!two_input) return BLACK_A;
+
+  //              if(c_group == CONSTR_A) face_is_blackA = true;
+  //              else if(c_group == CONSTR_B) face_is_blackB = true;
+  //              if(face_is_blackA && face_is_blackB) return BLACK_AB;
+  //            }
+
+  //            if (lpt)  break;
+
+  //            out_from_all++;
+  //        }
+  //        if (out_from_all == face.coplanar_constraints.size()) return WHITE;
+  //    }
+
+  //    // All face vertices are on the boundary of some coplanar constraints.
+  //    for (uint32_t c = 0; c < face.coplanar_constraints.size(); c++) {
+
+  //        const uint32_t constr = face.coplanar_constraints[c];
+  //        const CONSTR_GROUP_T c_group = constraint_group[ constr ];
+  //        if( two_input && faceColour_matches_constrGroup(c_group, face_is_blackA, face_is_blackB) ) continue;
+
+  //        const uint32_t *constraint = constraints_vrts.data() + 3*constr;
+  //        if (coplanar_constraint_innerIntersects_face(face.edges, constraint, xyz)){
+
+  //          if(!two_input) return BLACK_A;
+
+  //          if(c_group == CONSTR_A) face_is_blackA = true;
+  //          else if(c_group == CONSTR_B) face_is_blackB = true;
+  //          if(face_is_blackA && face_is_blackB) return BLACK_AB;
+
+  //        }
+  //    }
+
+  //    if(face_is_blackA) return BLACK_A;
+  //    else if(face_is_blackB) return BLACK_B;
+
+  //    return WHITE;
+  //}
 
 }
 

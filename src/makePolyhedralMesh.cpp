@@ -513,6 +513,7 @@ BSPcomplex* makePolyhedralMesh(
 
   //#define MEM_THRESHOLD   32768
 
+
     uint64_t cell_ind = 0;
     while (cell_ind < complex.cells.size())
     {
@@ -522,8 +523,9 @@ BSPcomplex* makePolyhedralMesh(
             if (getPeakMegabytesUsed() > MEM_THRESHOLD) ip_error("Maximum memory reached\n");
         }
 #endif
-        if (complex.cells[cell_ind].constraints.size() > 0)
+        if (complex.cells[cell_ind].constraints.size() > 0) {
             complex.splitCell(cell_ind);
+        }
         else  cell_ind++;
     }
     clock_t time6 = clock();
@@ -540,7 +542,8 @@ BSPcomplex* makePolyhedralMesh(
     //--Decide colour of GREY faces-----------------------------------------------
     for (uint64_t face_ind = 0; face_ind < complex.faces.size(); face_ind++) {
         BSPface& face = complex.faces[face_ind];
-        if (face.colour == GREY)   face.colour = complex.blackAB_or_white(face_ind, bool_opcode != '0');
+        if (face.colour == GREY)   
+            face.colour = complex.blackAB_or_white(face_ind, bool_opcode != '0');
     }
 
     clock_t time7 = clock();

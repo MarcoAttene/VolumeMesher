@@ -408,7 +408,6 @@ template<class PT, class T> static inline int dotProductSign2D_EEI_t(const gener
 inline int dotProductSign2D_EEI(const genericPoint& q, const double& px, const double& py, const double& rx, const double& ry) {
 	int ret;
 	if ((ret = dotProductSign2D_EEI_t<interval_number, interval_number>(q, px, py, rx, ry)) != 0) return ret;
-	if ((ret = dotProductSign2D_EEI_t<s_expansion, expansion>(q, px, py, rx, ry)) != INT_MAX) return ret;
 	return dotProductSign2D_EEI_t<bigfloat, bigfloat>(q, px, py, rx, ry);
 }
 
@@ -450,7 +449,6 @@ template<class PT, class T> static inline int dotProductSign2D_IEE_t(const gener
 inline int dotProductSign2D_IEE(const genericPoint& p, const double& rx, const double& ry, const double& qx, const double& qy) {
 	int ret;
 	if ((ret = dotProductSign2D_IEE_t<interval_number, interval_number>(p, rx, ry, qx, qy)) != 0) return ret;
-	if ((ret = dotProductSign2D_IEE_t<s_expansion, expansion>(p, rx, ry, qx, qy)) != INT_MAX) return ret;
 	return dotProductSign2D_IEE_t<bigfloat, bigfloat>(p, rx, ry, qx, qy);
 }
 
@@ -552,7 +550,6 @@ template<class PT, class T> static inline int dotProductSign2D_IIE_t(const gener
 inline int dotProductSign2D_IIE(const genericPoint& p, const genericPoint& r, const double& qx, const double& qy) {
 	int ret;
 	if ((ret = dotProductSign2D_IIE_t<interval_number, interval_number>(p, r, qx, qy)) != 0) return ret;
-	if ((ret = dotProductSign2D_IIE_t<s_expansion, expansion>(p, r, qx, qy)) != INT_MAX) return ret;
 	return dotProductSign2D_IIE_t<bigfloat, bigfloat>(p, r, qx, qy);
 }
 
@@ -612,7 +609,6 @@ template<class PT, class T> static inline int dotProductSign2D_III_t(const gener
 inline int dotProductSign2D_III(const genericPoint& p, const genericPoint& r, const genericPoint& q) {
 	int ret;
 	if ((ret = dotProductSign2D_III_t<interval_number, interval_number>(p, r, q)) != 0) return ret;
-	if ((ret = dotProductSign2D_III_t<s_expansion, expansion>(p, r, q)) != INT_MAX) return ret;
 	return dotProductSign2D_III_t<bigfloat, bigfloat>(p, r, q);
 }
 
@@ -662,7 +658,6 @@ template<class PT, class T> static inline int dotProductSign3D_EEI_t(const gener
 inline int dotProductSign3D_EEI(const genericPoint& q, const double& px, const double& py, const double& pz, const double& rx, const double& ry, const double& rz) {
 	int ret;
 	if ((ret = dotProductSign3D_EEI_t<interval_number, interval_number>(q, px, py, pz, rx, ry, rz)) != 0) return ret;
-	if ((ret = dotProductSign3D_EEI_t<s_expansion, expansion>(q, px, py, pz, rx, ry, rz)) != INT_MAX) return ret;
 	return dotProductSign3D_EEI_t<bigfloat, bigfloat>(q, px, py, pz, rx, ry, rz);
 }
 
@@ -709,7 +704,6 @@ template<class PT, class T> static inline int dotProductSign3D_IEE_t(const gener
 inline int dotProductSign3D_IEE(const genericPoint& p, const double& rx, const double& ry, const double& rz, const double& qx, const double& qy, const double& qz) {
 	int ret;
 	if ((ret = dotProductSign3D_IEE_t<interval_number, interval_number>(p, rx, ry, rz, qx, qy, qz)) != 0) return ret;
-	if ((ret = dotProductSign3D_IEE_t<s_expansion, expansion>(p, rx, ry, rz, qx, qy, qz)) != INT_MAX) return ret;
 	return dotProductSign3D_IEE_t<bigfloat, bigfloat>(p, rx, ry, rz, qx, qy, qz);
 }
 
@@ -824,7 +818,6 @@ template<class PT, class T> static inline int dotProductSign3D_IIE_t(const gener
 inline int dotProductSign3D_IIE(const genericPoint& p, const genericPoint& r, const double& qx, const double& qy, const double& qz) {
 	int ret;
 	if ((ret = dotProductSign3D_IIE_t<interval_number, interval_number>(p, r, qx, qy, qz)) != 0) return ret;
-	if ((ret = dotProductSign3D_IIE_t<s_expansion, expansion>(p, r, qx, qy, qz)) != INT_MAX) return ret;
 	return dotProductSign3D_IIE_t<bigfloat, bigfloat>(p, r, qx, qy, qz);
 }
 
@@ -892,7 +885,6 @@ template<class PT, class T> static inline int dotProductSign3D_III_t(const gener
 inline int dotProductSign3D_III(const genericPoint& p, const genericPoint& r, const genericPoint& q) {
 	int ret;
 	if ((ret = dotProductSign3D_III_t<interval_number, interval_number>(p, r, q)) != 0) return ret;
-	if ((ret = dotProductSign3D_III_t<s_expansion, expansion>(p, r, q)) != INT_MAX) return ret;
 	return dotProductSign3D_III_t<bigfloat, bigfloat>(p, r, q);
 }
 
@@ -2376,7 +2368,6 @@ template<class PT, class T> static inline int lessThanOnX_IE_t(const genericPoin
 inline int lessThanOnX_IE(const genericPoint& p1, const double& bx) {
 	int ret;
 	if ((ret = lessThanOnX_IE_t<interval_number, interval_number>(p1, bx)) != 0) return ret;
-	if ((ret = lessThanOnX_IE_t<s_expansion, expansion>(p1, bx)) != INT_MAX) return ret;
 	return lessThanOnX_IE_t<bigfloat, bigfloat>(p1, bx);
 }
 
@@ -2418,7 +2409,6 @@ template<class PT, class T> static inline int lessThanOnX_II_t(const genericPoin
 inline int lessThanOnX_II(const genericPoint& p1, const genericPoint& p2) {
 	int ret;
 	if ((ret = lessThanOnX_II_t<interval_number, interval_number>(p1, p2)) != 0) return ret;
-	if ((ret = lessThanOnX_II_t<s_expansion, expansion>(p1, p2)) != INT_MAX) return ret;
 	return lessThanOnX_II_t<bigfloat, bigfloat>(p1, p2);
 }
 
@@ -2453,7 +2443,6 @@ template<class PT, class T> static inline int lessThanOnY_IE_t(const genericPoin
 inline int lessThanOnY_IE(const genericPoint& p1, const double& by) {
 	int ret;
 	if ((ret = lessThanOnY_IE_t<interval_number, interval_number>(p1, by)) != 0) return ret;
-	if ((ret = lessThanOnY_IE_t<s_expansion, expansion>(p1, by)) != INT_MAX) return ret;
 	return lessThanOnY_IE_t<bigfloat, bigfloat>(p1, by);
 }
 
@@ -2495,7 +2484,6 @@ template<class PT, class T> static inline int lessThanOnY_II_t(const genericPoin
 inline int lessThanOnY_II(const genericPoint& p1, const genericPoint& p2) {
 	int ret;
 	if ((ret = lessThanOnY_II_t<interval_number, interval_number>(p1, p2)) != 0) return ret;
-	if ((ret = lessThanOnY_II_t<s_expansion, expansion>(p1, p2)) != INT_MAX) return ret;
 	return lessThanOnY_II_t<bigfloat, bigfloat>(p1, p2);
 }
 
@@ -2530,7 +2518,6 @@ template<class PT, class T> static inline int lessThanOnZ_IE_t(const genericPoin
 inline int lessThanOnZ_IE(const genericPoint& p1, const double& bz) {
 	int ret;
 	if ((ret = lessThanOnZ_IE_t<interval_number, interval_number>(p1, bz)) != 0) return ret;
-	if ((ret = lessThanOnZ_IE_t<s_expansion, expansion>(p1, bz)) != INT_MAX) return ret;
 	return lessThanOnZ_IE_t<bigfloat, bigfloat>(p1, bz);
 }
 
@@ -2572,7 +2559,6 @@ template<class PT, class T> static inline int lessThanOnZ_II_t(const genericPoin
 inline int lessThanOnZ_II(const genericPoint& p1, const genericPoint& p2) {
 	int ret;
 	if ((ret = lessThanOnZ_II_t<interval_number, interval_number>(p1, p2)) != 0) return ret;
-	if ((ret = lessThanOnZ_II_t<s_expansion, expansion>(p1, p2)) != INT_MAX) return ret;
 	return lessThanOnZ_II_t<bigfloat, bigfloat>(p1, p2);
 }
 
@@ -2615,7 +2601,6 @@ template<class PT, class T> static inline int orient2dxy_indirect_IEE_t(const ge
 inline int orient2dxy_indirect_IEE(const genericPoint& p1, const double& p2x, const double& p2y, const double& p3x, const double& p3y) {
 	int ret;
 	if ((ret = orient2dxy_indirect_IEE_t<interval_number, interval_number>(p1, p2x, p2y, p3x, p3y)) != 0) return ret;
-	if ((ret = orient2dxy_indirect_IEE_t<s_expansion, expansion>(p1, p2x, p2y, p3x, p3y)) != INT_MAX) return ret;
 	return orient2dxy_indirect_IEE_t<bigfloat, bigfloat>(p1, p2x, p2y, p3x, p3y);
 }
 
@@ -2667,7 +2652,6 @@ template<class PT, class T> static inline int orient2dxy_indirect_IIE_t(const ge
 inline int orient2dxy_indirect_IIE(const genericPoint& p1, const genericPoint& p2, const double& op3x, const double& op3y) {
 	int ret;
 	if ((ret = orient2dxy_indirect_IIE_t<interval_number, interval_number>(p1, p2, op3x, op3y)) != 0) return ret;
-	if ((ret = orient2dxy_indirect_IIE_t<s_expansion, expansion>(p1, p2, op3x, op3y)) != INT_MAX) return ret;
 	return orient2dxy_indirect_IIE_t<bigfloat, bigfloat>(p1, p2, op3x, op3y);
 }
 
@@ -2727,7 +2711,6 @@ template<class PT, class T> static inline int orient2dxy_indirect_III_t(const ge
 inline int orient2dxy_indirect_III(const genericPoint& p1, const genericPoint& p2, const genericPoint& p3) {
 	int ret;
 	if ((ret = orient2dxy_indirect_III_t<interval_number, interval_number>(p1, p2, p3)) != 0) return ret;
-	if ((ret = orient2dxy_indirect_III_t<s_expansion, expansion>(p1, p2, p3)) != INT_MAX) return ret;
 	return orient2dxy_indirect_III_t<bigfloat, bigfloat>(p1, p2, p3);
 }
 
@@ -2770,7 +2753,6 @@ template<class PT, class T> static inline int orient2dyz_indirect_IEE_t(const ge
 inline int orient2dyz_indirect_IEE(const genericPoint& p1, const double& p2x, const double& p2y, const double& p3x, const double& p3y) {
 	int ret;
 	if ((ret = orient2dyz_indirect_IEE_t<interval_number, interval_number>(p1, p2x, p2y, p3x, p3y)) != 0) return ret;
-	if ((ret = orient2dyz_indirect_IEE_t<s_expansion, expansion>(p1, p2x, p2y, p3x, p3y)) != INT_MAX) return ret;
 	return orient2dyz_indirect_IEE_t<bigfloat, bigfloat>(p1, p2x, p2y, p3x, p3y);
 }
 
@@ -2822,7 +2804,6 @@ template<class PT, class T> static inline int orient2dyz_indirect_IIE_t(const ge
 inline int orient2dyz_indirect_IIE(const genericPoint& p1, const genericPoint& p2, const double& op3x, const double& op3y) {
 	int ret;
 	if ((ret = orient2dyz_indirect_IIE_t<interval_number, interval_number>(p1, p2, op3x, op3y)) != 0) return ret;
-	if ((ret = orient2dyz_indirect_IIE_t<s_expansion, expansion>(p1, p2, op3x, op3y)) != INT_MAX) return ret;
 	return orient2dyz_indirect_IIE_t<bigfloat, bigfloat>(p1, p2, op3x, op3y);
 }
 
@@ -2882,7 +2863,6 @@ template<class PT, class T> static inline int orient2dyz_indirect_III_t(const ge
 inline int orient2dyz_indirect_III(const genericPoint& p1, const genericPoint& p2, const genericPoint& p3) {
 	int ret;
 	if ((ret = orient2dyz_indirect_III_t<interval_number, interval_number>(p1, p2, p3)) != 0) return ret;
-	if ((ret = orient2dyz_indirect_III_t<s_expansion, expansion>(p1, p2, p3)) != INT_MAX) return ret;
 	return orient2dyz_indirect_III_t<bigfloat, bigfloat>(p1, p2, p3);
 }
 
@@ -2925,7 +2905,6 @@ template<class PT, class T> static inline int orient2dzx_indirect_IEE_t(const ge
 inline int orient2dzx_indirect_IEE(const genericPoint& p1, const double& p2x, const double& p2y, const double& p3x, const double& p3y) {
 	int ret;
 	if ((ret = orient2dzx_indirect_IEE_t<interval_number, interval_number>(p1, p2x, p2y, p3x, p3y)) != 0) return ret;
-	if ((ret = orient2dzx_indirect_IEE_t<s_expansion, expansion>(p1, p2x, p2y, p3x, p3y)) != INT_MAX) return ret;
 	return orient2dzx_indirect_IEE_t<bigfloat, bigfloat>(p1, p2x, p2y, p3x, p3y);
 }
 
@@ -2977,7 +2956,6 @@ template<class PT, class T> static inline int orient2dzx_indirect_IIE_t(const ge
 inline int orient2dzx_indirect_IIE(const genericPoint& p1, const genericPoint& p2, const double& op3x, const double& op3y) {
 	int ret;
 	if ((ret = orient2dzx_indirect_IIE_t<interval_number, interval_number>(p1, p2, op3x, op3y)) != 0) return ret;
-	if ((ret = orient2dzx_indirect_IIE_t<s_expansion, expansion>(p1, p2, op3x, op3y)) != INT_MAX) return ret;
 	return orient2dzx_indirect_IIE_t<bigfloat, bigfloat>(p1, p2, op3x, op3y);
 }
 
@@ -3037,7 +3015,6 @@ template<class PT, class T> static inline int orient2dzx_indirect_III_t(const ge
 inline int orient2dzx_indirect_III(const genericPoint& p1, const genericPoint& p2, const genericPoint& p3) {
 	int ret;
 	if ((ret = orient2dzx_indirect_III_t<interval_number, interval_number>(p1, p2, p3)) != 0) return ret;
-	if ((ret = orient2dzx_indirect_III_t<s_expansion, expansion>(p1, p2, p3)) != INT_MAX) return ret;
 	return orient2dzx_indirect_III_t<bigfloat, bigfloat>(p1, p2, p3);
 }
 
@@ -3080,7 +3057,6 @@ template<class PT, class T> static inline int orient2d_indirect_IEE_t(const gene
 inline int orient2d_indirect_IEE(const genericPoint& p1, const double& p2x, const double& p2y, const double& p3x, const double& p3y) {
 	int ret;
 	if ((ret = orient2d_indirect_IEE_t<interval_number, interval_number>(p1, p2x, p2y, p3x, p3y)) != 0) return ret;
-	if ((ret = orient2d_indirect_IEE_t<s_expansion, expansion>(p1, p2x, p2y, p3x, p3y)) != INT_MAX) return ret;
 	return orient2d_indirect_IEE_t<bigfloat, bigfloat>(p1, p2x, p2y, p3x, p3y);
 }
 
@@ -3132,7 +3108,6 @@ template<class PT, class T> static inline int orient2d_indirect_IIE_t(const gene
 inline int orient2d_indirect_IIE(const genericPoint& p1, const genericPoint& p2, const double& p3x, const double& p3y) {
 	int ret;
 	if ((ret = orient2d_indirect_IIE_t<interval_number, interval_number>(p1, p2, p3x, p3y)) != 0) return ret;
-	if ((ret = orient2d_indirect_IIE_t<s_expansion, expansion>(p1, p2, p3x, p3y)) != INT_MAX) return ret;
 	return orient2d_indirect_IIE_t<bigfloat, bigfloat>(p1, p2, p3x, p3y);
 }
 
@@ -3192,7 +3167,6 @@ template<class PT, class T> static inline int orient2d_indirect_III_t(const gene
 inline int orient2d_indirect_III(const genericPoint& p1, const genericPoint& p2, const genericPoint& p3) {
 	int ret;
 	if ((ret = orient2d_indirect_III_t<interval_number, interval_number>(p1, p2, p3)) != 0) return ret;
-	if ((ret = orient2d_indirect_III_t<s_expansion, expansion>(p1, p2, p3)) != INT_MAX) return ret;
 	return orient2d_indirect_III_t<bigfloat, bigfloat>(p1, p2, p3);
 }
 
@@ -3235,7 +3209,6 @@ template<class PT, class T> static inline int orient3d_indirect_IEEE_t(const gen
 inline int orient3d_indirect_IEEE(const genericPoint& p1, const double& p2x, const double& p2y, const double& p2z, const double& p3x, const double& p3y, const double& p3z, const double& p4x, const double& p4y, const double& p4z) {
 	int ret;
 	if ((ret = orient3d_indirect_IEEE_t<interval_number, interval_number>(p1, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z)) != 0) return ret;
-	if ((ret = orient3d_indirect_IEEE_t<s_expansion, expansion>(p1, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z)) != INT_MAX) return ret;
 	return orient3d_indirect_IEEE_t<bigfloat, bigfloat>(p1, p2x, p2y, p2z, p3x, p3y, p3z, p4x, p4y, p4z);
 }
 
