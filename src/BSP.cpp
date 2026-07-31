@@ -440,10 +440,7 @@ void BSPcomplex::vrts_orient_wrtPlane(const vector<uint32_t>& vrts_inds,
    for(uint32_t v=0; v<vrts_inds.size(); v++){
       genericPoint* vrt = vertices[vrts_inds[v]];
       if(isVertexBuiltFromPlane(vrt, &p0, &p1, &p2)) vrts_orBin[vrts_inds[v]]=0;
-      else{
-        vrts_orBin[vrts_inds[v]] = genericPoint::orient3D(*vrt, p0, p2, p1);
-
-      }
+      else vrts_orBin[vrts_inds[v]] = genericPoint::orient3D(*vrt, p0, p2, p1);
     }
 }
 
@@ -1876,10 +1873,6 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
   uint32_t c1 = constraints_vrts[constr_ID+1];
   uint32_t c2 = constraints_vrts[constr_ID+2];
 
-  // Search for coplanar constraints.
-  vector<uint32_t> coplanar_constr;
-  find_coplanar_constraints(cell_ind, constr, coplanar_constr);
-
   // Distinguish between two mutually exclusive cases:
   // CASE. NO SPLIT: only cell boundary elements (face or edge) lie on the
   //                 constraint-plane, while the other elements belong to
@@ -1890,7 +1883,8 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
   // Create a local richer data structure to avoid multilple extracions of cell
   // edges and vertices.
   uint64_t num_cellEdges = count_cellEdges(cell);
-  uint64_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
+  uint64_t num_cellVrts = num_cellEdges + 2 - cell.faces.size(); // Euler formula
+  //uint64_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
   vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
   vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
   fill_cell_locDS(cell, cell_edges, cell_vrts);
@@ -1905,6 +1899,10 @@ void BSPcomplex::splitCell(uint64_t cell_ind){
   // CASE. NO SPLIT:
   // at least two cell_vrts_or are 0, the other (!=0) have the same signe.
   if (vrtsUNDER == 0 || vrtsOVER == 0) return;
+
+  // Search for coplanar constraints.
+  vector<uint32_t> coplanar_constr;
+  find_coplanar_constraints(cell_ind, constr, coplanar_constr);
 
   // (else) CASE. SPLIT-INTERIOR:
   // at least two cell_vrts_or have opposite signe.

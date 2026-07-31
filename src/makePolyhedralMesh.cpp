@@ -542,7 +542,7 @@ BSPcomplex* makePolyhedralMesh(
     //--Decide colour of GREY faces-----------------------------------------------
     for (uint64_t face_ind = 0; face_ind < complex.faces.size(); face_ind++) {
         BSPface& face = complex.faces[face_ind];
-        if (face.colour == GREY)   
+        if (face.colour == GREY)
             face.colour = complex.blackAB_or_white(face_ind, bool_opcode != '0');
     }
 
