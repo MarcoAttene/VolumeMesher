@@ -49,6 +49,10 @@ void read_OFF_file(const char* filename,
     fclose(file);
 }
 
+#ifndef _MSC_VER
+#define NDEBUG
+#endif
+
 /// <summary>
 /// Main function
 /// </summary>
