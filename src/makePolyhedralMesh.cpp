@@ -1,5 +1,4 @@
 #include "conforming_mesh.h"
-#include "extended_predicates.h"
 #include "BSP.h"
 #include <time.h>
 #include "string.h"
@@ -7,6 +6,14 @@
 
 double getPeakMegabytesUsed();
 void PrintMemoryInfo();
+
+// Vertex type
+
+struct vertex_t {
+    double coord[3];          // Coordinates
+    uint64_t inc_tet;         // Incident tetrahedron
+    uint32_t original_index;  // Index to support reordering
+};
 
 int vertex_compare(const void* void_v1, const void* void_v2)
 {
@@ -57,6 +64,11 @@ void remove_duplicated_points(vertex_t** vertices_p, uint32_t* npts,
 
 
 /// //////////////////////////////////////////////////////////////////////////////////////////
+
+bool misAlignment(const double* p, const double* q, const double* r) {
+    explicitPoint3D ep(p[0], p[1], p[2]), eq(q[0], q[1], q[2]), er(r[0], r[1], r[2]);
+    return explicitPoint3D::misaligned(ep, eq, er);
+}
 
 void read_nodes_and_constraints(double* coords_A, uint32_t npts_A, uint32_t* tri_idx_A, uint32_t ntri_A,
     vertex_t** vertices_p, uint32_t* npts,
@@ -340,13 +352,14 @@ BSPcomplex* makePolyhedralMesh(
 
     //--Initialization-----------------
 
-    TetMesh* mesh = new TetMesh;
+    vertex_t* vertices;
+    uint32_t num_vertices;
     constraints_t* constraints = new constraints_t;
 
     if (!two_input) {
         read_nodes_and_constraints(coords_A, npts_A, tri_idx_A, ntri_A,
-            &mesh->vertices,
-            &mesh->num_vertices,
+            &vertices,
+            &num_vertices,
             &constraints->tri_vertices,
             &constraints->num_triangles,
             verbose);
@@ -355,15 +368,26 @@ BSPcomplex* makePolyhedralMesh(
     else { // two input
         read_nodes_and_constraints_twoInput(coords_A, npts_A, tri_idx_A, ntri_A,
             coords_B, npts_B, tri_idx_B, ntri_B,
-            &mesh->vertices,
-            &mesh->num_vertices,
+            &vertices,
+            &num_vertices,
             &constraints->tri_vertices,
             &constraints->num_triangles,
             &constraints->constr_group,
             verbose);
     }
 
-    if (mesh->num_vertices < 4) ip_error("Cannot mesh less than 4 vertices.");
+    TetMesh* mesh = new TetMesh;
+    std::vector<double> coordinates(num_vertices * 3);
+    for (uint32_t i = 0, j = 0; i < num_vertices; i++) {
+        coordinates[j++] = vertices[i].coord[0];
+        coordinates[j++] = vertices[i].coord[1];
+        coordinates[j++] = vertices[i].coord[2];
+    }
+    mesh->init_vertices(coordinates.data(), num_vertices);
+
+    free(vertices);
+
+    if (mesh->numVertices() < 4) ip_error("Cannot mesh less than 4 vertices.");
     if (constraints->num_triangles < 1) ip_error("No non-degenerate constraints loaded.");
 
     if (free_mem)
@@ -394,32 +418,32 @@ BSPcomplex* makePolyhedralMesh(
 
     //--Delaunay-Insertion-----------------
 
-    // Setup for following vertex permutation in tetrahedrize
-    for (uint32_t i = 0; i < mesh->num_vertices; i++)
-        mesh->vertices[i].original_index = i;
+    //// Setup for following vertex permutation in tetrahedrize
+    //for (uint32_t i = 0; i < mesh->numVertices(); i++)
+    //    mesh->vertices[i].original_index = i;
 
     // Create Delaunay tetrahedrization of the vertices
     mesh->tetrahedrize();
     //mesh->saveTET("delaunay.tet");
 
-    // Align constraint vertices after vertex permutation
+    //// Align constraint vertices after vertex permutation
 
-    if (mesh->vertices[2].original_index != 3)
-    {
-        for (uint32_t k = 0; k < 3 * constraints->num_triangles; k++)
-            constraints->tri_vertices[k] = mesh->vertices[constraints->tri_vertices[k]].original_index;
-    }
-    else
-    {
-        for (uint32_t k = 0; k < 3 * constraints->num_triangles; k++)
-        {
-            uint32_t l = mesh->vertices[3].original_index;
-            uint32_t c = constraints->tri_vertices[k];
-            if (c == 2) constraints->tri_vertices[k] = l;
-            else if (c == 3) constraints->tri_vertices[k] = 2;
-            else if (c == l) constraints->tri_vertices[k] = 3;
-        }
-    }
+    //if (mesh->vertices[2].original_index != 3)
+    //{
+    //    for (uint32_t k = 0; k < 3 * constraints->num_triangles; k++)
+    //        constraints->tri_vertices[k] = mesh->vertices[constraints->tri_vertices[k]].original_index;
+    //}
+    //else
+    //{
+    //    for (uint32_t k = 0; k < 3 * constraints->num_triangles; k++)
+    //    {
+    //        uint32_t l = mesh->vertices[3].original_index;
+    //        uint32_t c = constraints->tri_vertices[k];
+    //        if (c == 2) constraints->tri_vertices[k] = l;
+    //        else if (c == 3) constraints->tri_vertices[k] = 2;
+    //        else if (c == l) constraints->tri_vertices[k] = 3;
+    //    }
+    //}
 
 
     clock_t time2 = clock();
@@ -450,19 +474,19 @@ BSPcomplex* makePolyhedralMesh(
     //    it points to an array (map[i] of lenght num_map[i]) whose elements
     //    are the indices of the constraints which improperly intersect the
     //    i-th tetrahedron.
-    uint32_t* num_map = (uint32_t*)calloc(mesh->tet_num, sizeof(uint32_t));
-    uint32_t** map = (uint32_t**)calloc(mesh->tet_num, sizeof(uint32_t*));
+    uint32_t* num_map = (uint32_t*)calloc(mesh->numTets(), sizeof(uint32_t));
+    uint32_t** map = (uint32_t**)calloc(mesh->numTets(), sizeof(uint32_t*));
 
     // Initalize other 4 maps to memory the tet-faces that are partially or
     // completely overlap with a constraint.
-    uint32_t* num_map_f0 = (uint32_t*)calloc(mesh->tet_num, sizeof(uint32_t));
-    uint32_t** map_f0 = (uint32_t**)calloc(mesh->tet_num, sizeof(uint32_t*));
-    uint32_t* num_map_f1 = (uint32_t*)calloc(mesh->tet_num, sizeof(uint32_t));
-    uint32_t** map_f1 = (uint32_t**)calloc(mesh->tet_num, sizeof(uint32_t*));
-    uint32_t* num_map_f2 = (uint32_t*)calloc(mesh->tet_num, sizeof(uint32_t));
-    uint32_t** map_f2 = (uint32_t**)calloc(mesh->tet_num, sizeof(uint32_t*));
-    uint32_t* num_map_f3 = (uint32_t*)calloc(mesh->tet_num, sizeof(uint32_t));
-    uint32_t** map_f3 = (uint32_t**)calloc(mesh->tet_num, sizeof(uint32_t*));
+    uint32_t* num_map_f0 = (uint32_t*)calloc(mesh->numTets(), sizeof(uint32_t));
+    uint32_t** map_f0 = (uint32_t**)calloc(mesh->numTets(), sizeof(uint32_t*));
+    uint32_t* num_map_f1 = (uint32_t*)calloc(mesh->numTets(), sizeof(uint32_t));
+    uint32_t** map_f1 = (uint32_t**)calloc(mesh->numTets(), sizeof(uint32_t*));
+    uint32_t* num_map_f2 = (uint32_t*)calloc(mesh->numTets(), sizeof(uint32_t));
+    uint32_t** map_f2 = (uint32_t**)calloc(mesh->numTets(), sizeof(uint32_t*));
+    uint32_t* num_map_f3 = (uint32_t*)calloc(mesh->numTets(), sizeof(uint32_t));
+    uint32_t** map_f3 = (uint32_t**)calloc(mesh->numTets(), sizeof(uint32_t*));
 
     insert_constraints(mesh, constraints, num_map, map,
         num_map_f0, map_f0,
@@ -484,7 +508,7 @@ BSPcomplex* makePolyhedralMesh(
     BSPcomplex& complex = *complex_p;
 
     // Free the memory used by map(s) and num_map(s)
-    for (uint64_t i = 0; i < mesh->tet_num; i++) {
+    for (uint64_t i = 0; i < mesh->numTets(); i++) {
         if (num_map[i]) free(map[i]);
         if (num_map_f0[i]) free(map_f0[i]);
         if (num_map_f1[i]) free(map_f1[i]);

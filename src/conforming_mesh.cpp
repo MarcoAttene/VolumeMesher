@@ -1,5 +1,4 @@
 #include "conforming_mesh.h"
-#include "extended_predicates.h"
 #include "implicit_point.h"
 
 #define INTERSECTION 1
@@ -24,7 +23,7 @@
 
 static inline void extract_tetVrts(uint32_t* tet_vrts, uint64_t tet_ind,
                                    const TetMesh* mesh){
-    std::memcpy(tet_vrts, mesh->tet_node + 4 * tet_ind, 4 * sizeof(uint32_t));
+    std::memcpy(tet_vrts, mesh->tet_node.data() + 4 * tet_ind, 4 * sizeof(uint32_t));
     //tet_vrts[0] = mesh->tet_node[4*tet_ind    ];
     //tet_vrts[1] = mesh->tet_node[4*tet_ind + 1];
     //tet_vrts[2] = mesh->tet_node[4*tet_ind + 2];
@@ -60,7 +59,7 @@ static inline uint32_t vrt_pointInInnerSegment(uint32_t pt_ind,
                                                const TetMesh* mesh){
 
     return (pt_ind!=endpt0_ind && pt_ind!=endpt1_ind &&
-        pointInInnerSegment(mesh->vertices[pt_ind].coord, mesh->vertices[endpt0_ind].coord, mesh->vertices[endpt1_ind].coord));
+        pointType::pointInInnerSegment(mesh->vertices[pt_ind], mesh->vertices[endpt0_ind], mesh->vertices[endpt1_ind]));
 }
 
 static inline uint32_t vrt_pointInSegment(uint32_t pt_ind,
@@ -68,7 +67,7 @@ static inline uint32_t vrt_pointInSegment(uint32_t pt_ind,
                                           const TetMesh* mesh){
 
     return (pt_ind==endpt0_ind || pt_ind==endpt1_ind ||
-        pointInSegment(mesh->vertices[pt_ind].coord, mesh->vertices[endpt0_ind].coord, mesh->vertices[endpt1_ind].coord));
+        pointType::pointInSegment(mesh->vertices[pt_ind], mesh->vertices[endpt0_ind], mesh->vertices[endpt1_ind]));
 }
 
 static inline uint32_t vrt_pointInInnerTriangle(uint32_t pt_ind,
@@ -78,8 +77,8 @@ static inline uint32_t vrt_pointInInnerTriangle(uint32_t pt_ind,
     return (pt_ind != tri_vrt0_ind &&
        pt_ind != tri_vrt1_ind &&
        pt_ind != tri_vrt2_ind &&
-        pointInInnerTriangle(mesh->vertices[pt_ind].coord, 
-            mesh->vertices[tri_vrt0_ind].coord, mesh->vertices[tri_vrt1_ind].coord, mesh->vertices[tri_vrt2_ind].coord));
+        pointType::pointInInnerTriangle(mesh->vertices[pt_ind],
+           mesh->vertices[tri_vrt0_ind], mesh->vertices[tri_vrt1_ind], mesh->vertices[tri_vrt2_ind]));
 }
 
 static inline uint32_t vrt_pointInTriangle(uint32_t pt_ind,
@@ -89,8 +88,8 @@ static inline uint32_t vrt_pointInTriangle(uint32_t pt_ind,
     return (pt_ind == tri_vrt0_ind ||
        pt_ind == tri_vrt1_ind ||
        pt_ind == tri_vrt2_ind ||
-        pointInTriangle(mesh->vertices[pt_ind].coord,
-            mesh->vertices[tri_vrt0_ind].coord, mesh->vertices[tri_vrt1_ind].coord, mesh->vertices[tri_vrt2_ind].coord));
+        pointType::pointInTriangle(mesh->vertices[pt_ind],
+            mesh->vertices[tri_vrt0_ind], mesh->vertices[tri_vrt1_ind], mesh->vertices[tri_vrt2_ind]));
 }
 
 static inline uint32_t vrt_innerSegmentsCross(uint32_t endpt0sgmA_ind,
@@ -103,12 +102,13 @@ static inline uint32_t vrt_innerSegmentsCross(uint32_t endpt0sgmA_ind,
        endpt1sgmA_ind == endpt0sgmB_ind || endpt1sgmA_ind == endpt1sgmB_ind   )
          return 0;
 
-    const double* e0A_coord = mesh->vertices[endpt0sgmA_ind].coord;
-    const double* e1A_coord = mesh->vertices[endpt1sgmA_ind].coord;
-    const double* e0B_coord = mesh->vertices[endpt0sgmB_ind].coord;
-    const double* e1B_coord = mesh->vertices[endpt1sgmB_ind].coord;
+    const auto& e0A_coord = mesh->vertices[endpt0sgmA_ind];
+    const auto& e1A_coord = mesh->vertices[endpt1sgmA_ind];
+    const auto& e0B_coord = mesh->vertices[endpt0sgmB_ind];
+    const auto& e1B_coord = mesh->vertices[endpt1sgmB_ind];
 
-    return innerSegmentsCross(e0A_coord, e1A_coord, e0B_coord, e1B_coord);
+    if (pointType::orient3D(e0A_coord, e1A_coord, e0B_coord, e1B_coord) != 0) return 0;
+    return pointType::innerSegmentsCross(e0A_coord, e1A_coord, e0B_coord, e1B_coord);
 }
 
 static inline uint32_t vrt_innerSegmentCrossesInnerTriangle(uint32_t endpt0_ind,
@@ -123,12 +123,12 @@ static inline uint32_t vrt_innerSegmentCrossesInnerTriangle(uint32_t endpt0_ind,
        endpt0_ind==tri_vrt1_ind || endpt1_ind==tri_vrt1_ind ||
        endpt0_ind==tri_vrt2_ind || endpt1_ind==tri_vrt2_ind    ) return 0;
 
-    const double* e0_coord = mesh->vertices[endpt0_ind].coord;
-    const double* e1_coord = mesh->vertices[endpt1_ind].coord;
-    const double* t0_coord = mesh->vertices[tri_vrt0_ind].coord;
-    const double* t1_coord = mesh->vertices[tri_vrt1_ind].coord;
-    const double* t2_coord = mesh->vertices[tri_vrt2_ind].coord;
-    return innerSegmentCrossesInnerTriangle(e0_coord, e1_coord,
+    const auto& e0_coord = mesh->vertices[endpt0_ind];
+    const auto& e1_coord = mesh->vertices[endpt1_ind];
+    const auto& t0_coord = mesh->vertices[tri_vrt0_ind];
+    const auto& t1_coord = mesh->vertices[tri_vrt1_ind];
+    const auto& t2_coord = mesh->vertices[tri_vrt2_ind];
+    return pointType::innerSegmentCrossesInnerTriangle(e0_coord, e1_coord,
                                             t0_coord, t1_coord, t2_coord);
 }
 
@@ -143,12 +143,12 @@ static inline uint32_t vrt_innerSegmentCrossesTriangle(uint32_t endpt0_ind,
        endpt0_ind==tri_vrt1_ind || endpt1_ind==tri_vrt1_ind ||
        endpt0_ind==tri_vrt2_ind || endpt1_ind==tri_vrt2_ind    ) return 0;
 
-    const double* e0_coord = mesh->vertices[endpt0_ind].coord;
-    const double* e1_coord = mesh->vertices[endpt1_ind].coord;
-    const double* t0_coord = mesh->vertices[tri_vrt0_ind].coord;
-    const double* t1_coord = mesh->vertices[tri_vrt1_ind].coord;
-    const double* t2_coord = mesh->vertices[tri_vrt2_ind].coord;
-    return innerSegmentCrossesTriangle(e0_coord, e1_coord,
+    const auto& e0_coord = mesh->vertices[endpt0_ind];
+    const auto& e1_coord = mesh->vertices[endpt1_ind];
+    const auto& t0_coord = mesh->vertices[tri_vrt0_ind];
+    const auto& t1_coord = mesh->vertices[tri_vrt1_ind];
+    const auto& t2_coord = mesh->vertices[tri_vrt2_ind];
+    return pointType::innerSegmentCrossesTriangle(e0_coord, e1_coord,
                                        t0_coord, t1_coord, t2_coord);
 }
 
@@ -176,11 +176,11 @@ uint32_t vrt_signe_orient3d(uint32_t vrt1, uint32_t vrt2,
     if(vrt1==vrt2 || vrt1==vrt3 || vrt1==vrt4 ||
        vrt2==vrt3 || vrt2==vrt4 || vrt3==vrt4   ) return 0;
 
-    const double* vrt1_coord = mesh->vertices[vrt1].coord;
-    const double* vrt2_coord = mesh->vertices[vrt2].coord;
-    const double* vrt3_coord = mesh->vertices[vrt3].coord;
-    const double* vrt4_coord = mesh->vertices[vrt4].coord;
-    return signe_orient3d(vrt1_coord, vrt2_coord, vrt3_coord, vrt4_coord);
+    const auto& vrt1_coord = mesh->vertices[vrt1];
+    const auto& vrt2_coord = mesh->vertices[vrt2];
+    const auto& vrt3_coord = mesh->vertices[vrt3];
+    const auto& vrt4_coord = mesh->vertices[vrt4];
+    return pointType::orient3D(vrt1_coord, vrt2_coord, vrt3_coord, vrt4_coord);
 }
 
 // It is assumed that test verices and segment endpoints (that define a
@@ -192,11 +192,16 @@ static inline uint32_t vrt_same_half_plane(uint32_t test_vrt0, uint32_t test_vrt
   if(test_vrt0==strLine4_vrt0 || test_vrt0==strLine4_vrt1 ||
      test_vrt1==strLine4_vrt0 || test_vrt1==strLine4_vrt1   ) return 0;
 
-  const double* test0_coord = mesh->vertices[test_vrt0].coord;
-  const double* test1_coord = mesh->vertices[test_vrt1].coord;
-  const double* sL0_coord = mesh->vertices[strLine4_vrt0].coord;
-  const double* sL1_coord = mesh->vertices[strLine4_vrt1].coord;
-  return (same_half_plane(test0_coord, test1_coord, sL0_coord, sL1_coord));
+  const auto& test0_coord = mesh->vertices[test_vrt0];
+  const auto& test1_coord = mesh->vertices[test_vrt1];
+  const auto& sL0_coord = mesh->vertices[strLine4_vrt0];
+  const auto& sL1_coord = mesh->vertices[strLine4_vrt1];
+  if (pointType::orient2Dxy(test0_coord, sL0_coord, sL1_coord) != pointType::orient2Dxy(test1_coord, sL0_coord, sL1_coord)) return 0;
+  if (pointType::orient2Dyz(test0_coord, sL0_coord, sL1_coord) != pointType::orient2Dyz(test1_coord, sL0_coord, sL1_coord)) return 0;
+  if (pointType::orient2Dzx(test0_coord, sL0_coord, sL1_coord) != pointType::orient2Dzx(test1_coord, sL0_coord, sL1_coord)) return 0;
+  return 1;
+
+  //return (same_half_plane(test0_coord, test1_coord, sL0_coord, sL1_coord));
 }
 
 //----------------------------
@@ -332,7 +337,7 @@ static inline bool triangle_is_tetFace(uint32_t v0, uint32_t v1, uint32_t v2,
 //         i.e. returns the vertex_ID of the vertex different from v0,v1,v2.
 static inline uint32_t tet_faceID(uint32_t v0, uint32_t v1, uint32_t v2,
                                   uint64_t tet_ID, const TetMesh* mesh){
-    uint32_t* v = mesh->tet_node + tet_ID;
+    const uint32_t* v = mesh->tet_node.data() + tet_ID;
     if(v[0] != v0 && v[0] != v1 && v[0] != v2 ) return 0;
     if(v[1] != v0 && v[1] != v1 && v[1] != v2 ) return 1;
     if(v[2] != v0 && v[2] != v1 && v[2] != v2 ) return 2;
@@ -355,8 +360,12 @@ bool triangle_in_VT(uint32_t v0, uint32_t v1, uint32_t v2,
 
     bool found = false;
     uint64_t num_incTet_v0 = 0, tet_ID;
-    uint64_t* incTet_v0 = NULL;
-    incTet_v0 = mesh->incident_tetrahedra(v0, &num_incTet_v0);
+    //uint64_t* incTet_v0 = NULL;
+
+    std::vector<uint64_t> incTet_v0;
+    mesh->VT(v0, incTet_v0);
+    num_incTet_v0 = incTet_v0.size();
+    //incTet_v0 = mesh->incident_tetrahedra(v0, &num_incTet_v0);
 
     for(uint64_t i=0; i<num_incTet_v0; i++){
         tet_ID = 4*incTet_v0[i];
@@ -367,7 +376,7 @@ bool triangle_in_VT(uint32_t v0, uint32_t v1, uint32_t v2,
          }
     }
 
-    free(incTet_v0);
+    //free(incTet_v0);
     return found;
 }
 
@@ -380,7 +389,7 @@ bool triangle_in_VT(uint32_t v0, uint32_t v1, uint32_t v2,
 uint32_t opposite_vertex_face(const TetMesh* mesh,
                                   uint64_t tet_ind, const uint32_t* face_vrts){
 
-    const uint32_t *vp = mesh->tet_node + 4 * tet_ind;
+    const uint32_t *vp = mesh->tet_node.data() + 4 * tet_ind;
     uint32_t v;
     v = *(vp++);
     if(v!=face_vrts[0] && v!=face_vrts[1] && v!=face_vrts[2]) return v;
@@ -622,7 +631,7 @@ void add_virtual_constraint(uint32_t he, uint32_t pos,
   // Find a vertex (u) of a tetrahedron incident in one edge endpoints
   // half_edges[he].endpts[0] (or half_edges[he].endpts[1])
   // not aligned with the vertices of triangle half_edges[he].tri_id
-  const uint64_t tet_ind = mesh->vertices[v0].inc_tet; // non-ghost tet
+  const uint64_t tet_ind = mesh->inc_tet[v0]; // non-ghost tet
   uint32_t u = mesh->tet_node[4*tet_ind];
   uint32_t k=0;
 
@@ -677,23 +686,25 @@ bool tri_onSameEdge_allCoPlanar(uint32_t he0, uint32_t he1,
   v0 = constraints->tri_vertices[tri_id];
   v1 = constraints->tri_vertices[tri_id + 1];
   v2 = constraints->tri_vertices[tri_id + 2];
-  const double* v0c = mesh->vertices[v0].coord;
-  const double* v1c = mesh->vertices[v1].coord;
-  const double* v2c = mesh->vertices[v2].coord;
-  const int dom = genericPoint::maxComponentInTriangleNormal(v0c[0], v0c[1], v0c[2], v1c[0], v1c[1], v1c[2], v2c[0], v2c[1], v2c[2]);
+  const auto& v0p = mesh->vertices[v0];
+  const auto& v1p = mesh->vertices[v1];
+  const auto& v2p = mesh->vertices[v2];
+  const int dom = genericPoint::maxComponentInTriangleNormal(v0p.X(), v0p.Y(), v0p.Z(), v1p.X(), v1p.Y(), v1p.Z(), v2p.X(), v2p.Y(), v2p.Z());
 
-  double e0c[2], e1c[2], oc[2];
+  const double base_or = pointType::orient2D(mesh->vertices[hp0], mesh->vertices[hp1], mesh->vertices[u], dom);
 
-  int i, j;
-  for (i = j = 0; i < 3; i++) if (i != dom)
-  {
-      e0c[j] = mesh->vertices[hp0].coord[i];
-      e1c[j] = mesh->vertices[hp1].coord[i];
-      oc[j] = mesh->vertices[u].coord[i];
-      j++;
-  }
+  //double e0c[2], e1c[2], oc[2];
 
-  const double base_or = orient2d(e0c, e1c, oc);
+  //int i, j;
+  //for (i = j = 0; i < 3; i++) if (i != dom)
+  //{
+  //    e0c[j] = mesh->vertices[hp0].coord[i];
+  //    e1c[j] = mesh->vertices[hp1].coord[i];
+  //    oc[j] = mesh->vertices[u].coord[i];
+  //    j++;
+  //}
+  //
+  //const double base_or = orient2d(e0c, e1c, oc);
   const int base_or_sign = (base_or > 0) - (base_or < 0);
 
   for (uint32_t he = he0 + 1; he <= he1; he++) {
@@ -704,9 +715,12 @@ bool tri_onSameEdge_allCoPlanar(uint32_t he0, uint32_t he1,
       u = v0;
       if (hp0 != v1 && hp1 != v1) u = v1;
       else if (hp0 != v2 && hp1 != v2) u = v2;
-      for (i = j = 0; i < 3; i++) if (i != dom)
-          oc[j++] = mesh->vertices[u].coord[i];
-      const double new_or = orient2d(e0c, e1c, oc);
+
+      const double new_or = pointType::orient2D(mesh->vertices[hp0], mesh->vertices[hp1], mesh->vertices[u], dom);
+
+      //for (i = j = 0; i < 3; i++) if (i != dom)
+      //    oc[j++] = mesh->vertices[u].coord[i];
+      //const double new_or = orient2d(e0c, e1c, oc);
       const int new_or_sign = (new_or > 0) - (new_or < 0);
       if (new_or_sign != base_or_sign) return false;
   }
@@ -1697,8 +1711,11 @@ uint64_t* intersections_TetVrtOnConstraintSide(TetMesh* mesh,
     //   (3) (v_curr,v_stop) intersects n tetrahedra along a common edge.
     //   (3') like 3), but the other endpoint of the common edge is v_stop.
 
-    uint64_t num_incTet;
-    uint64_t* incTet = mesh->incident_tetrahedra(v_curr, &num_incTet);
+    std::vector<uint64_t> incTet;
+    mesh->VT(v_curr, incTet);
+
+    uint64_t num_incTet = incTet.size();
+    //uint64_t* incTet = mesh->incident_tetrahedra(v_curr, &num_incTet);
     // ghost-tets are NOT returned.
 
     // Not already visited tet_
@@ -1815,8 +1832,8 @@ uint64_t* intersections_TetVrtOnConstraintSide(TetMesh* mesh,
     // In case (3') return the tetrahedron itself.
     *nextTet_ind = tet_ind;
 
-    free(incTet);
-    incTet = NULL;
+    //free(incTet);
+    //incTet = NULL;
     return newTetIn_incTet;
 }
 
@@ -1872,10 +1889,12 @@ uint64_t* intersections_TetEdgeCrossConstraintSide(TetMesh* mesh,
     //   (4) (v_start,v_stop) intersects exactly 2 tetrahedra along a common
     //       face and cuts one the edge (different from tet_cutted_edge)
     //       of that face.
+    std::vector<uint64_t> incTet;
+    mesh->ETfull(tet_cutted_edge[0], tet_cutted_edge[1], incTet);
 
-    uint64_t num_incTet;
-    uint64_t* incTet = mesh->ETrelation(tet_cutted_edge,
-                                  *nextTet_ind, &num_incTet);
+    uint64_t num_incTet = incTet.size();
+    //uint64_t* incTet = mesh->ETrelation(tet_cutted_edge,
+    //                              *nextTet_ind, &num_incTet);
 
     // Not already visited tet_
     uint64_t num_newTetIn_incTet = 0;
@@ -2051,8 +2070,8 @@ uint64_t* intersections_TetEdgeCrossConstraintSide(TetMesh* mesh,
     // In case (3') return the tetrahedron itself.
     *nextTet_ind = tet_ind;
 
-    free(incTet);
-    incTet = NULL;
+    //free(incTet);
+    //incTet = NULL;
     return newTetIn_incTet;
 }
 
@@ -2812,7 +2831,7 @@ void insert_constraints(TetMesh* mesh, constraints_t* constraints,
     // - faces (2D)overlapping with constraints, wherever its the face opposite
     //   to vertex j=0,1,2 or 3...
     //      -> marked as OVERLAP2D_Fj
-    uint32_t* mark_TetIntersection = (uint32_t*) calloc(mesh->tet_num, sizeof(uint32_t));
+    uint32_t* mark_TetIntersection = (uint32_t*) calloc(mesh->numTets(), sizeof(uint32_t));
 
     // Search interections on each constraint.
     for(uint32_t tri_ind=0; tri_ind<constraints->num_triangles; tri_ind++){

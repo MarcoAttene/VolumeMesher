@@ -6,7 +6,7 @@
 #include <vector>
 #include <ctype.h>
 #include <utility>
-#include "delaunay.h"
+#include "delaunay3d_wrapper.h"
 #include "conforming_mesh.h"
 #include "implicit_point.h"
 

@@ -43,9 +43,7 @@ project(mesh_generator)
 
 set (SOURCES
     src/makePolyhedralMesh.cpp
-    src/delaunay.cpp
     src/conforming_mesh.cpp
-    src/extended_predicates.cpp
     src/BSP.cpp
     src/inOutPartition.cpp
     src/winMem.cpp
@@ -68,6 +66,7 @@ include(FetchContent)
 if(EXISTS ../.local.cmake)
 	set(nfg_SOURCE_DIR "../NFG/")
 	set(indirect_predicates_SOURCE_DIR "../Indirect_Predicates/")
+	set(delaunay3d_SOURCE_DIR "../Delaunay3D/")
 else()
 	FetchContent_Declare(
 		nfg
@@ -80,6 +79,12 @@ else()
 		URL https://github.com/MarcoAttene/Indirect_Predicates/archive/refs/heads/master.zip)
 	FetchContent_Populate(Indirect_Predicates)
 	message(STATUS "Indirect_Predicates is available in " ${indirect_predicates_SOURCE_DIR})
+
+	FetchContent_Declare(
+		Delaunay3D
+		URL https://github.com/MarcoAttene/Delaunay3D/archive/refs/heads/master.zip)
+	FetchContent_Populate(Delaunay3D)
+	message(STATUS "Delaunay3D is available in " ${delaunay3d_SOURCE_DIR})
 
 endif()
 
@@ -136,6 +141,7 @@ target_include_directories(${TARGET} PUBLIC
 	src
 	${nfg_SOURCE_DIR}/include
 	${indirect_predicates_SOURCE_DIR}/include
+	${delaunay3d_SOURCE_DIR}/include
 )
 endforeach(TARGET)
 

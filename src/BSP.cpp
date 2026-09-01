@@ -4,7 +4,6 @@
 #include <time.h>
 #include <algorithm>
 #include "BSP.h"
-#include "delaunay.h"
 
 #define OPPOSITE_SIGNE(a,b) (a<0 && b>0) || (a>0 && b<0)
 #define MIN_VECT_ELEM(v,n,it,i_min)  it=1; i_min=0; do{ if(v[it]<v[i_min]) i_min=it; it++; }while(it<n)
@@ -611,19 +610,19 @@ int localizedPointInTriangle(const genericPoint& P, const genericPoint& A,
 //         tetrahedra indexing, but without ghost-tets).
 uint64_t BSPcomplex::removing_ghost_tets(const TetMesh* mesh,
                                          vector<uint64_t>& new_order){
-  // new_order have as many element as mesh->tet_num,
+  // new_order have as many element as mesh->numTets(),
   // new_order[i-th tet] =
   //    i - (num of ghost_tet between 0 and i) IF i-th tet is non-ghost
   //    UINT64_MAX                             IF i-th tet is ghost
   uint64_t ghost_tet_count = 0;
-  for(uint64_t tet_ind=0; tet_ind<mesh->tet_num; tet_ind++){
+  for(uint64_t tet_ind=0; tet_ind<mesh->numTets(); tet_ind++){
       if(IS_GHOST_TET(tet_ind)){
         new_order[tet_ind] = UINT64_MAX;
         ghost_tet_count++;
       }
       else  new_order[tet_ind] = tet_ind - ghost_tet_count;
   }
-  return mesh->tet_num - ghost_tet_count;
+  return mesh->numTets() - ghost_tet_count;
 }
 
 //  Input: pointer to mesh,
@@ -637,17 +636,10 @@ uint64_t BSPcomplex::removing_ghost_tets(const TetMesh* mesh,
 uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
                                  uint64_t tet_ind,
                                  const vector<uint64_t>& new_order){
-    // Tetrahedra incident in <endpt0,endpt1>
-    uint32_t edge_ends[2] = { e0, e1 };
-    uint64_t num_incTet;
-    uint64_t* incTet = mesh->ETrelation(edge_ends, tet_ind, &num_incTet);
-    // Note. ETrelation can return ghost-tet.
-
     uint64_t min = UINT64_MAX;
-    for (uint32_t i = 0; i < num_incTet; i++)
-        if (!IS_GHOST_TET(incTet[i]) && incTet[i] < min) min = incTet[i];
-
-    free(incTet);
+    static thread_local std::vector<uint64_t> et; et.clear();
+    mesh->ETfast(e0, e1, tet_ind, et);
+    for (uint64_t t : et) if (t < min) min = t;
 
     if(min == tet_ind){
       // None of the tetrahedra incident in <e0,e1> has been visited,
@@ -803,15 +795,15 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
                        const uint32_t** map_f3, const uint32_t* num_map_f3 ){
 
   // Uploading the vertices of the mesh
-  vertices.resize(mesh->num_vertices);
-  for(uint32_t vrt=0; vrt<mesh->num_vertices; vrt++)
-    vertices[vrt] = new explicitPoint3D(mesh->vertices[vrt].coord[0],
-                                            mesh->vertices[vrt].coord[1],
-                                            mesh->vertices[vrt].coord[2]);
+  vertices.resize(mesh->numVertices());
+  for (uint32_t vrt = 0; vrt < mesh->numVertices(); vrt++) {
+      const double* crd = mesh->vertices[vrt].coord;
+      vertices[vrt] = new explicitPoint3D(crd[0], crd[1], crd[2]);
+  }
 
   // Initialize vrts_orBin:
   // since orient3D can be -1, 0 or 1 all elements are set to 2.
-  vrts_orBin.resize(mesh->num_vertices, 2);
+  vrts_orBin.resize(mesh->numVertices(), 2);
 
   // Uploading the constraints (the last num_virtual_triangles constraints are virtual.)
   first_virtual_constraint = _constraints->num_triangles - _constraints->num_virtual_triangles;
@@ -825,12 +817,12 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   }
 
   // Establish new tetrahedtra-(cell) indexing: only non-ghost cell are indexed.
-  vector<uint64_t> new_order(mesh->tet_num, UINT64_MAX);
+  vector<uint64_t> new_order(mesh->numTets(), UINT64_MAX);
   uint64_t cell_num = removing_ghost_tets(mesh, new_order);
 
   // Creating as many empty cells as the number of non-ghost tet_
   cells.resize(cell_num);
-  edges.reserve(cell_num + mesh->num_vertices);
+  edges.reserve(cell_num + mesh->numVertices());
   faces.reserve(cell_num * 2);
 
 
@@ -838,7 +830,7 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   // cells -> the non-ghost tetrahedra in the mesh,
   // faces -> the faces of the non-ghost tetrahedra in the mesh,
   // edges -> the edges of the non-ghost tetrahedra in the mesh.
-  for(uint64_t tet_ind=0; tet_ind<mesh->tet_num; tet_ind++){
+  for(uint64_t tet_ind=0; tet_ind<mesh->numTets(); tet_ind++){
     // Here each BSPcell is a non-ghost tetrahedron of the mesh:
     // consider a tetrahedron (tet) whose index is tet_ind.
     uint64_t cell_ind = new_order[tet_ind];
@@ -1847,142 +1839,160 @@ void BSPcomplex::find_coplanar_constraints(uint64_t cell_ind, uint32_t constr,
 
 }
 
-//  Input: index of a BSPcell: cell_ind.
-// Output: nothing.
-// Note. it is assumed that the BScell is (only) convex,
-//       strictly convexity is not guaranteed.
-void BSPcomplex::splitCell(uint64_t cell_ind){
+void BSPcomplex::splitCell(uint64_t cell_ind)
+{
+    BSPcell& cell = cells[cell_ind];
+    auto& cts = cell.constraints;
 
-  // Extract the last contraint that intersect the cell and remove it from
-  // the list. The cell will be splitted by that constraint.
-  BSPcell& cell = cells[cell_ind];
-  auto& cts = cell.constraints;
-  uint32_t constr = cts.back();
-  cts.pop_back();
+    // Distinguish between two mutually exclusive cases:
+    // CASE. NO SPLIT: only cell boundary elements (face or edge) lie on the
+    //                 constraint-plane, while the other elements belong to
+    //                 the same half-space w.r.t. the constraint-plane.
+    // CASE. SPLIT-INTERIOR: constraint-plane pass through the cell interior.
+    // Note. it is not possible that only a vertex lies on the constraint-plane.
 
-  // Virtual constraints should be used only when non-virtual constraints are over
-  if (is_virtual(constr)) {
-      for (size_t i = 0; i < cts.size(); i++) if (!is_virtual(cts[i])) {
-          std::swap(cts[i], constr); 
-          break;
-      }
-  }
+    // Create a local richer data structure to avoid multilple extracions of cell
+    // edges and vertices.
+    //
+    // This is built once and then reused across the NO SPLIT constraints below. Such a
+    // constraint leaves the cell untouched -- no edge, face or vertex of it changes -- so
+    // the lists stay valid and rebuilding them would reproduce exactly what we already
+    // have. On inputs where most constraints handed to a cell do not actually cut it, that
+    // rebuild dominates the run time.
+    uint64_t num_cellEdges = count_cellEdges(cell);
+    uint64_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
+    vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
+    vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
+    fill_cell_locDS(cell, cell_edges, cell_vrts);
 
-  uint32_t constr_ID = 3*constr;
-  uint32_t c0 = constraints_vrts[constr_ID  ];
-  uint32_t c1 = constraints_vrts[constr_ID+1];
-  uint32_t c2 = constraints_vrts[constr_ID+2];
+    uint32_t constr = UINT32_MAX, c0 = 0, c1 = 0, c2 = 0;
+    uint32_t vrtsON, vrtsOVER, vrtsUNDER;
+    bool splits = false;
 
-  // Distinguish between two mutually exclusive cases:
-  // CASE. NO SPLIT: only cell boundary elements (face or edge) lie on the
-  //                 constraint-plane, while the other elements belong to
-  //                 the same half-space w.r.t. the constraint-plane.
-  // CASE. SPLIT-INTERIOR: constraint-plane pass through the cell interior.
-  // Note. it is not possible that only a vertex lies on the constraint-plane.
+    // Take constraints from the back, exactly as before; the only difference is that a
+    // constraint which turns out not to cut the cell is now skipped here instead of
+    // returning to the caller, which would call us straight back to rebuild the same
+    // lists. The order in which constraints are examined, and everything done to each one,
+    // are unchanged.
+    while (!cts.empty()) {
+        // Extract the last contraint that intersect the cell and remove it from
+        // the list. The cell will be splitted by that constraint.
+        constr = cts.back();
+        cts.pop_back();
 
-  // Create a local richer data structure to avoid multilple extracions of cell
-  // edges and vertices.
-  uint64_t num_cellEdges = count_cellEdges(cell);
-  uint64_t num_cellVrts = num_cellEdges + 2 - cell.faces.size(); // Euler formula
-  //uint64_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
-  vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
-  vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
-  fill_cell_locDS(cell, cell_edges, cell_vrts);
+        // Virtual constraints should be used only when non-virtual constraints are over
+        if (is_virtual(constr)) {
+            for (size_t i = 0; i < cts.size(); i++)
+                if (!is_virtual(cts[i])) {
+                    std::swap(cts[i], constr);
+                    break;
+                }
+        }
 
-  // Compute the orientation of cell vertices w.r.t. the constraint plane.
-  vrts_orient_wrtPlane(cell_vrts, c0, c1, c2, 1);
+        const uint32_t constr_ID = 3 * constr;
+        c0 = constraints_vrts[constr_ID];
+        c1 = constraints_vrts[constr_ID + 1];
+        c2 = constraints_vrts[constr_ID + 2];
 
-  // Analysis of cell vertices disposition w.r.t. constraint-plane.
-  uint32_t vrtsON, vrtsOVER, vrtsUNDER;
-  count_vrt_orBin(cell_vrts, &vrtsOVER, &vrtsUNDER, &vrtsON);
+        // Compute the orientation of cell vertices w.r.t. the constraint plane.
+        vrts_orient_wrtPlane(cell_vrts, c0, c1, c2, 1);
 
-  // CASE. NO SPLIT:
-  // at least two cell_vrts_or are 0, the other (!=0) have the same signe.
-  if (vrtsUNDER == 0 || vrtsOVER == 0) return;
+        // Analysis of cell vertices disposition w.r.t. constraint-plane.
+        count_vrt_orBin(cell_vrts, &vrtsOVER, &vrtsUNDER, &vrtsON);
 
-  // Search for coplanar constraints.
-  vector<uint32_t> coplanar_constr;
-  find_coplanar_constraints(cell_ind, constr, coplanar_constr);
+        // CASE. NO SPLIT:
+        // at least two cell_vrts_or are 0, the other (!=0) have the same signe.
+        // The cell is unchanged, so keep the local data structure and try the next one.
+        if (vrtsUNDER == 0 || vrtsOVER == 0) continue;
 
-  // (else) CASE. SPLIT-INTERIOR:
-  // at least two cell_vrts_or have opposite signe.
-
-  // Split cell edges whose endpoints have opposite cell_vrts_or signe.
-  for(uint64_t e=0; e<cell_edges.size(); e++){
-      BSPedge& edge = edges[cell_edges[e]];
-      if(constraint_innerIntersects_edge(edge, cell_vrts)){
-        splitEdge(cell_edges[e], constr);  // Here the edge is splitted.
-        // Add the new vertex to cell_vrts, compute its orient3D w.r.t. the
-        // constraint-plane and add it to cell_vrts_or.
-        uint32_t new_vrt = (uint32_t)(vertices.size() -1);
-        cell_vrts.push_back(new_vrt);
-        cell_edges.push_back(edges.size() -1);
-        vrts_orBin[new_vrt] = 0;
-
-        #ifdef DEBUG_BSP_DEEP
-        vector<uint32_t> vrt_to_print;
-        vrt_to_print.push_back(new_vrt);
-        printf("\n");
-        print_vrt_orBin(vrts_orBin, vrt_to_print);
-        #endif
-      }
-  }
-  // Now all the BSPcell edges are over or under the constraint.
-
-  // Split cell-faces that have at lesat two vertices with opposite
-  // cell_vrts_or signe.
-
-  uint64_t num_faces = cell.faces.size();
-  for(uint64_t f=0; f<num_faces; f++){
-    uint64_t face_ind = cell.faces[f];
-    BSPface& face = faces[face_ind];
-    vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
-    list_faceVertices(face, face_vrts);
-
-    if(constraint_innerIntersects_face(face_vrts) ){
-
-      // Here the face is splitted.
-      // The intersection between face and constraint-plane is a new edge.
-      splitFace(face_ind, constr, cell_ind, face_vrts);
-
-      // Add new edge (the face-slpitting one) to cell_edges
-      cell_edges.push_back(edges.size()-1);
+        splits = true;
+        break;
     }
-  }
+    if (!splits) return;
 
-  // The cell is divided in two subcells: the up-subcell and the down-subcell.
-  // The up-subcell have vertices with non-negative cell_vrts_or.
-  // The down-subcell have vertices with non-positive cell_vrts_or.
-  //
-  // The cell faces are partitioned between the two subcells.
-  // A cell face intesecting the constraint-plane is splitted in sub-faces.
-  //
-  // A new face is created: the common face between up-subcell and down-subcell.
-  //
-  // Conventionally the down-subcell replace cell in the vector cells,
-  // while up-subcell is appended to the vector cells.
+    // Search for coplanar constraints.
+    vector<uint32_t> coplanar_constr;
+    find_coplanar_constraints(cell_ind, constr, coplanar_constr);
 
-  // up-subcell
-  cells.push_back( BSPcell() );
-  uint64_t newCell_ind = cells.size() - 1;
+    // (else) CASE. SPLIT-INTERIOR:
+    // at least two cell_vrts_or have opposite signe.
 
-  facesPartition(cell_ind, newCell_ind, cell_vrts);
-  // Add common face between up-subcell and down-subcell.
-  add_commonFace(constr, cell_ind, newCell_ind, cell_vrts, cell_edges);
+    // Split cell edges whose endpoints have opposite cell_vrts_or signe.
 
-  // If there are coplanar constraints (to the one used for splitting) those
-  // constraints have to be aded to the common face.
-  uint32_t num_coplanar_constr = (uint32_t)coplanar_constr.size();
-  faces.back().coplanar_constraints.resize(1 + num_coplanar_constr);
-  faces.back().coplanar_constraints[0] = constr;
-  if(num_coplanar_constr > 0)
-    for(uint32_t cc=0; cc<num_coplanar_constr; cc++)
-      faces.back().coplanar_constraints[1+cc] = coplanar_constr[cc];
+    for (uint64_t e = 0; e < cell_edges.size(); e++) {
+        BSPedge& edge = edges[cell_edges[e]];
+        if (constraint_innerIntersects_edge(edge, cell_vrts)) {
+            splitEdge(cell_edges[e], constr); // Here the edge is splitted.
+            // Add the new vertex to cell_vrts, compute its orient3D w.r.t. the
+            // constraint-plane and add it to cell_vrts_or.
+            uint32_t new_vrt = (uint32_t)(vertices.size() - 1);
+            cell_vrts.push_back(new_vrt);
+            cell_edges.push_back(edges.size() - 1);
+            vrts_orBin[new_vrt] = 0;
 
-  // Constraints that have to be partitioned between up-subcell
-  // and down-subcell are: cells[cell].constarints.
+#ifdef DEBUG_BSP_DEEP
+            vector<uint32_t> vrt_to_print;
+            vrt_to_print.push_back(new_vrt);
+            printf("\n");
+            print_vrt_orBin(vrts_orBin, vrt_to_print);
+#endif
+        }
+    }
+    // Now all the BSPcell edges are over or under the constraint.
 
-  constraintsPartition(constr, cell_ind, newCell_ind, cell_vrts);
+    // Split cell-faces that have at lesat two vertices with opposite
+    // cell_vrts_or signe.
+
+    uint64_t num_faces = cell.faces.size();
+    for (uint64_t f = 0; f < num_faces; f++) {
+        uint64_t face_ind = cell.faces[f];
+        BSPface& face = faces[face_ind];
+        vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+        list_faceVertices(face, face_vrts);
+
+        if (constraint_innerIntersects_face(face_vrts)) {
+            // Here the face is splitted.
+            // The intersection between face and constraint-plane is a new edge.
+            splitFace(face_ind, constr, cell_ind, face_vrts);
+
+            // Add new edge (the face-slpitting one) to cell_edges
+            cell_edges.push_back(edges.size() - 1);
+        }
+    }
+
+    // The cell is divided in two subcells: the up-subcell and the down-subcell.
+    // The up-subcell have vertices with non-negative cell_vrts_or.
+    // The down-subcell have vertices with non-positive cell_vrts_or.
+    //
+    // The cell faces are partitioned between the two subcells.
+    // A cell face intesecting the constraint-plane is splitted in sub-faces.
+    //
+    // A new face is created: the common face between up-subcell and down-subcell.
+    //
+    // Conventionally the down-subcell replace cell in the vector cells,
+    // while up-subcell is appended to the vector cells.
+
+    // up-subcell
+    cells.push_back(BSPcell());
+    uint64_t newCell_ind = cells.size() - 1;
+
+    facesPartition(cell_ind, newCell_ind, cell_vrts);
+    // Add common face between up-subcell and down-subcell.
+    add_commonFace(constr, cell_ind, newCell_ind, cell_vrts, cell_edges);
+
+    // If there are coplanar constraints (to the one used for splitting) those
+    // constraints have to be aded to the common face.
+    uint32_t num_coplanar_constr = (uint32_t)coplanar_constr.size();
+    faces.back().coplanar_constraints.resize(1 + num_coplanar_constr);
+    faces.back().coplanar_constraints[0] = constr;
+    if (num_coplanar_constr > 0)
+        for (uint32_t cc = 0; cc < num_coplanar_constr; cc++)
+            faces.back().coplanar_constraints[1 + cc] = coplanar_constr[cc];
+
+    // Constraints that have to be partitioned between up-subcell
+    // and down-subcell are: cells[cell].constarints.
+
+    constraintsPartition(constr, cell_ind, newCell_ind, cell_vrts);
 }
 
 //--Complex tetrahedralization-------------------------
@@ -2690,8 +2700,8 @@ void BSPcomplex::extractSkinTriMesh(const char* filename, const char bool_opcode
 
     *coords = (double*)malloc(sizeof(double) * 3 * num_v);
     *tri_idx = (uint32_t*)malloc(sizeof(uint32_t) * 3 * num_border_faces);
-    *npts = num_v;
-    *ntri = num_border_faces;
+    *npts = (uint32_t)num_v;
+    *ntri = (uint32_t)num_border_faces;
 
     // Store vertex coordinates
     for (uint32_t v = 0, i = 0; v < vertices.size(); v++) if (vrts_visit[v])

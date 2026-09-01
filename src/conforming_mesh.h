@@ -1,7 +1,7 @@
 #ifndef _CONFORMING_MESH_
 #define _CONFORMING_MESH_
 
-#include "delaunay.h"
+#include "delaunay3d_wrapper.h"
 
 #define CONSTR_GROUP_T uint32_t
 #define CONSTR_A 0

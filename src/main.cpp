@@ -49,10 +49,6 @@ void read_OFF_file(const char* filename,
     fclose(file);
 }
 
-#ifndef _MSC_VER
-#define NDEBUG
-#endif
-
 /// <summary>
 /// Main function
 /// </summary>
@@ -129,7 +125,7 @@ int main(int argc, char** argv)
     bool logging = false;
     bool surfmesh = false;
     bool blackfaces = false;
-    const char* fileA_name = "D:\\SYNC_DATA\\Sviluppo_Software\\My_Software\\GIT_REPOS\\TetMeshes\\Input_file\\100070.off";
+    const char* fileA_name = "..\\models\\wood_fish.off";
     char* fileB_name = NULL;
     char bool_opcode = '0';
     bool two_input = (bool_opcode != '0');
