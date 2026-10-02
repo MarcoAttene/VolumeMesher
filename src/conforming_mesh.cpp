@@ -343,7 +343,7 @@ static inline uint32_t tet_faceID(uint32_t v0, uint32_t v1, uint32_t v2,
     if(v[2] != v0 && v[2] != v1 && v[2] != v2 ) return 2;
     if(v[3] != v0 && v[3] != v1 && v[3] != v2 ) return 3;
 
-    ip_error("tet_faceID: FATAL ERROR no faces of tet correspond to vertices.\n");
+    NFG::ip_error("tet_faceID: FATAL ERROR no faces of tet correspond to vertices.\n");
     return UINT32_MAX;
 }
 
@@ -689,7 +689,7 @@ bool tri_onSameEdge_allCoPlanar(uint32_t he0, uint32_t he1,
   const auto& v0p = mesh->vertices[v0];
   const auto& v1p = mesh->vertices[v1];
   const auto& v2p = mesh->vertices[v2];
-  const int dom = genericPoint::maxComponentInTriangleNormal(v0p.X(), v0p.Y(), v0p.Z(), v1p.X(), v1p.Y(), v1p.Z(), v2p.X(), v2p.Y(), v2p.Z());
+  const int dom = IPs::genericPoint::maxComponentInTriangleNormal(v0p.X(), v0p.Y(), v0p.Z(), v1p.X(), v1p.Y(), v1p.Z(), v2p.X(), v2p.Y(), v2p.Z());
 
   const double base_or = pointType::orient2D(mesh->vertices[hp0], mesh->vertices[hp1], mesh->vertices[u], dom);
 

@@ -6,24 +6,24 @@ void read_OFF_file(const char* filename,
 
     FILE* file = fopen(filename, "r");
     if (file == NULL)
-        ip_error("read_nodes_and_constraints: FATAL ERROR "
+        NFG::ip_error("read_nodes_and_constraints: FATAL ERROR "
             "cannot open input file.\n");
 
     // Check OFF mark (1st line).
     char file_ext_read[3];
     char file_ext_target[] = { 'O','F','F' };
     if (fscanf(file, "%3c", file_ext_read) == 0)
-        ip_error("read_nodes_and_constraints: FATAL ERROR "
+        NFG::ip_error("read_nodes_and_constraints: FATAL ERROR "
             "cannot read 1st line of input file\n");
 
     for (uint32_t i = 0; i < 3; i++)
         if (file_ext_read[i] != file_ext_target[i])
-            ip_error("read_nodes_and_constraints: FATAL ERROR "
+            NFG::ip_error("read_nodes_and_constraints: FATAL ERROR "
                 "1st line of input file is different from OFF\n");
 
     // Reading number of points and triangles.
     if (fscanf(file, " %d %d %*d ", npts, ntri) == 0)
-        ip_error("read_nodes_and_constraints: FATAL ERROR 2st line of "
+        NFG::ip_error("read_nodes_and_constraints: FATAL ERROR 2st line of "
             "input file do not contanins point and triangles numbers.\n");
 
     if (verbose) printf("file %s contains %d vertices and %d constraints (triangles)\n",
@@ -36,15 +36,15 @@ void read_OFF_file(const char* filename,
     for (uint32_t i = 0; i < (*npts); i++) {
         if (fscanf(file, " %lf %lf %lf ",
             (*vertices_p) + (i * 3), (*vertices_p) + (i * 3 + 1), (*vertices_p) + (i * 3 + 2)) == 0)
-            ip_error("error reading input file\n");
+            NFG::ip_error("error reading input file\n");
     }
 
     uint32_t nv;
     for (uint32_t i = 0; i < (*ntri); i++) {
         if (fscanf(file, " %u %u %u %u ", &nv,
             (*tri_vertices_p) + (i * 3), (*tri_vertices_p) + (i * 3 + 1), (*tri_vertices_p) + (i * 3 + 2)) == 0)
-            ip_error("error reading input file\n");
-        if (nv != 3) ip_error("Non-triangular faces not supported\n");
+            NFG::ip_error("error reading input file\n");
+        if (nv != 3) NFG::ip_error("Non-triangular faces not supported\n");
     }
     fclose(file);
 }
@@ -94,12 +94,12 @@ int main(int argc, char** argv)
             else if (argv[i][1] == 'l') logging = true;
             else if (argv[i][1] == 'b') blackfaces = true;
             else if (argv[i][1] == 's') surfmesh = true;
-            else ip_error("Unknown option\n");
+            else NFG::ip_error("Unknown option\n");
         }
         else if (fileA_name == NULL) fileA_name = argv[i];
         else if (bool_opcode == '0') bool_opcode = argv[i][0];
         else if (fileB_name == NULL) fileB_name = argv[i];
-        else ip_error("Too many args passed\n");
+        else NFG::ip_error("Too many args passed\n");
     }
 
     bool two_input = (bool_opcode != '0');

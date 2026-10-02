@@ -111,7 +111,7 @@ public:
 
     BSPface(uint32_t m_v1, uint32_t m_v2, uint32_t m_v3,
             uint64_t c1, uint64_t c2, COLOUR_T _colour,
-            const vector<uint32_t>& constraints){
+            const std::vector<uint32_t>& constraints){
 
         meshVertices[0] = m_v1;
         meshVertices[1] = m_v2;
@@ -153,12 +153,12 @@ public:
 
     BSPcell(){}
 
-    BSPcell(const vector<uint64_t>& cell_faces){
+    BSPcell(const std::vector<uint64_t>& cell_faces){
         faces.assign(cell_faces.begin(), cell_faces.end());
     }
 
-    BSPcell(const vector<uint64_t>& cell_faces,
-            const vector<uint32_t>& intersect_constrs){
+    BSPcell(const std::vector<uint64_t>& cell_faces,
+            const std::vector<uint32_t>& intersect_constrs){
         faces.assign(cell_faces.begin(), cell_faces.end());
         constraints.assign(intersect_constrs.begin(), intersect_constrs.end());
     }
@@ -176,7 +176,7 @@ public:
 class BSPcomplex{
     public:
 
-    std::vector<genericPoint*> vertices; // mesh vertices + new vertices.
+    std::vector<IPs::genericPoint*> vertices; // mesh vertices + new vertices.
                                          // new vertices -> intersections
                                          // between tetrahedra and constraints.
     std::vector<BSPedge> edges;
@@ -207,7 +207,7 @@ class BSPcomplex{
                const uint32_t** map_f2, const uint32_t* num_map_f2,
                const uint32_t** map_f3, const uint32_t* num_map_f3 );
 
-    ~BSPcomplex() { for (genericPoint* v : vertices) delete v; }
+    ~BSPcomplex() { for (IPs::genericPoint* v : vertices) delete v; }
 
     // Save the faces representing the input constraints
     void saveBlackFaces(const char* filename, bool triangulate = false);
@@ -235,18 +235,18 @@ class BSPcomplex{
     uint64_t count_cellEdges(const BSPcell& cell);
     uint32_t count_cellVertices(const BSPcell& cell,
                                        uint64_t* num_cellEdges);
-    void list_cellEdges(BSPcell& cell, vector<uint64_t>& cell_edges);
+    void list_cellEdges(BSPcell& cell, std::vector<uint64_t>& cell_edges);
     void list_cellVertices(BSPcell& cell, uint64_t num_cellEdges,
-                           vector<uint32_t>& cell_vrts);
-    void list_faceVertices(BSPface& face, vector<uint32_t>& face_vrts);
-    void fill_cell_locDS(BSPcell& cell, vector<uint64_t>& cell_edges,
-                         vector<uint32_t>& cell_vrts);
+                           std::vector<uint32_t>& cell_vrts);
+    void list_faceVertices(BSPface& face, std::vector<uint32_t>& face_vrts);
+    void fill_cell_locDS(BSPcell& cell, std::vector<uint64_t>& cell_edges,
+                         std::vector<uint32_t>& cell_vrts);
     inline uint64_t find_face_edge(const BSPface& face, uint32_t v, uint32_t u);
     uint64_t count_cellFaces_inc_cellVrt(const BSPcell& cell, uint32_t v);
     void cell_VFrelation(const BSPcell& cell, uint32_t v,
-                         vector<uint64_t>& v_incFaces_ind);
+                         std::vector<uint64_t>& v_incFaces_ind);
     void COMPL_cell_VFrelation(const BSPcell& cell, uint32_t v,
-                                vector<uint64_t>& v_NOT_incFaces_ind);
+                                std::vector<uint64_t>& v_NOT_incFaces_ind);
     bool is_virtual(uint32_t constr_ind);
 
     // Return 1 if p is in the interior of the cell, 0 if it is on its border, -1 if it is outside
@@ -263,21 +263,21 @@ class BSPcomplex{
     void makeEFrelation(const uint64_t e_id, std::vector<uint64_t>& ef);
 
     // Geometric predicates
-    void vrts_orient_wrtPlane(const vector<uint32_t>& vrts_inds,
+    void vrts_orient_wrtPlane(const std::vector<uint32_t>& vrts_inds,
                     uint32_t plane_pt0, uint32_t plane_pt1, uint32_t plane_pt2, uint32_t count);
-    inline void count_vrt_orBin(const vector<uint32_t>& inds,
+    inline void count_vrt_orBin(const std::vector<uint32_t>& inds,
                                 uint32_t* pos, uint32_t* neg, uint32_t* zero);
     inline bool constraint_innerIntersects_edge(const BSPedge& edge,
-                                         const vector<uint32_t>& cell_vrts);
-    inline bool constraint_innerIntersects_face(const vector<uint32_t>& face_vrts);
-    bool coplanar_constraint_innerIntersects_face(const vector<uint64_t>& face_edges,
+                                         const std::vector<uint32_t>& cell_vrts);
+    inline bool constraint_innerIntersects_face(const std::vector<uint32_t>& face_vrts);
+    bool coplanar_constraint_innerIntersects_face(const std::vector<uint64_t>& face_edges,
                                                   const uint32_t constraint[3],
                                                   const int dominant_normal_comp      );
 
     // Upload Delaunay triangolation
-    uint64_t removing_ghost_tets(const TetMesh* mesh, vector<uint64_t>& new_order);
+    uint64_t removing_ghost_tets(const TetMesh* mesh, std::vector<uint64_t>& new_order);
     uint64_t add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
-                         uint64_t tet_ind, const vector<uint64_t>& new_order);
+                         uint64_t tet_ind, const std::vector<uint64_t>& new_order);
     inline uint64_t add_tetFace(uint32_t v0, uint32_t v1, uint32_t v2,
                          uint64_t cell_ind, uint64_t adjCell_ind);
     inline bool tet_face_isNew(uint64_t tet_ind, uint64_t adjTet_ind,
@@ -293,34 +293,34 @@ class BSPcomplex{
     inline void remove_constraint(uint32_t constr_cell_ind, uint64_t cell_ind);
     void edgesPartition(uint64_t face_ind, uint64_t newFace_ind);
     void facesPartition(uint64_t cell_ind, uint64_t newCell_ind,
-                        const vector<uint32_t>& cell_vrts);
+                        const std::vector<uint32_t>& cell_vrts);
     void constraintsPartition(uint32_t ref_constr,
                               uint64_t down_cell_ind, uint64_t up_cell_ind,
-                              const vector<uint32_t>& cell_vrts);
+                              const std::vector<uint32_t>& cell_vrts);
     void add_edgeToOrdFaceEdges(BSPface& face, uint64_t newEdge_ind);
     void add_commonEdge(uint32_t constr, uint64_t face_ind, uint64_t newFace_ind,
                         const uint32_t* endpts);
     void add_edges_toCommFaceEdges(BSPface& face,
-                                   const vector<uint64_t>& edges_ind);
+                                   const std::vector<uint64_t>& edges_ind);
     void add_commonFace(uint32_t constr,
                         uint64_t cell_ind, uint64_t newCell_ind,
-                        const vector<uint32_t>& cell_vrts,
-                        const vector<uint64_t>& cell_edges);
+                        const std::vector<uint32_t>& cell_vrts,
+                        const std::vector<uint64_t>& cell_edges);
     void fixCommonFaceOrientation(uint64_t cf_id);
     uint32_t add_LPIvrt(const BSPedge& edge, uint32_t constr);
     uint32_t add_TPIvrt(const BSPedge& edge, uint32_t constr);
     void splitEdge(uint64_t edge_ind, uint32_t constr);
     void splitFace(uint64_t face_ind, uint32_t constr, uint64_t cell_ind,
-                   const vector<uint32_t>& face_vrts);
+                   const std::vector<uint32_t>& face_vrts);
     void splitCell(uint64_t cell_ind);
     void find_coplanar_constraints(uint64_t cell_ind, uint32_t constr,
-                                              vector<uint32_t>& coplanar_c);
+                                              std::vector<uint32_t>& coplanar_c);
 
     // Decide colour of GREY faces
     int face_dominant_normal_component(const BSPface& face);
     void get_approx_faceBaricenterCoord(const BSPface& face, double* bar);
     bool is_baricenter_inFace(const BSPface& face,
-                             const explicitPoint3D& face_center, int max_normComp);
+                             const IPs::explicitPoint3D& face_center, int max_normComp);
     
     bool hasFaceCoordinates(uint64_t face_ind, double crds[9], double tolerance);
 
@@ -334,8 +334,8 @@ class BSPcomplex{
     bool triangle_detach(uint64_t face_ind);
     bool aligned_face_edges(uint64_t fe0, uint64_t fe1, const BSPface& face);
     void triangulateFace(uint64_t face_ind);
-    genericPoint *createExactBarycenter(const vector<uint32_t>& vrts);
-    void computeBaricenter(const vector<uint32_t>& vrts);
+    IPs::genericPoint *createExactBarycenter(const std::vector<uint32_t>& vrts);
+    void computeBaricenter(const std::vector<uint32_t>& vrts);
     inline uint64_t triFace_oppEdge(const BSPface& face, uint32_t v);
     uint64_t triFace_shareEdge(const BSPcell& cell, uint64_t face_ind,
                                            uint64_t vOppEdge_ind);

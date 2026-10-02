@@ -9,6 +9,7 @@
 #define USE_MAROTS_METHOD
 
 #include "delaunay.h"
+using namespace Del3D;
 
 typedef basicVec3d pointType;
 typedef TetMesh_t<pointType> TetMesh;

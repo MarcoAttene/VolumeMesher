@@ -5,6 +5,8 @@
 #include <algorithm>
 #include "BSP.h"
 
+using namespace IPs;
+
 #define OPPOSITE_SIGNE(a,b) (a<0 && b>0) || (a>0 && b<0)
 #define MIN_VECT_ELEM(v,n,it,i_min)  it=1; i_min=0; do{ if(v[it]<v[i_min]) i_min=it; it++; }while(it<n)
 #define SAME_EDGE_ENDPTS(e1,e2,E1,E2)  ((e1==E1 && e2==E2) || (e1==E2 && e2==E1))
@@ -23,8 +25,8 @@
 // Output: by using vect returns the original vector shifted-down (i.e.
 //         according to increasing order) of num_shift position.
 // EX. vect = {3,7,2,5,2} num_shift = 2 -> vect = {5,2,3,7,2}.
-inline void UINT64_vect_down_shift(vector<uint64_t>& vect, uint64_t num_shift){
-  vector<uint64_t> tmp(num_shift, UINT64_MAX);
+inline void UINT64_vect_down_shift(std::vector<uint64_t>& vect, uint64_t num_shift){
+  std::vector<uint64_t> tmp(num_shift, UINT64_MAX);
   uint64_t shift_start_pos = vect.size() - num_shift;
   for(uint64_t pos=0; pos<num_shift; pos++)
      tmp[pos] = vect[shift_start_pos + pos];
@@ -40,8 +42,8 @@ inline void UINT64_vect_down_shift(vector<uint64_t>& vect, uint64_t num_shift){
 // Output: by using vect returns the original vector shifted-up (i.e.
 //         according to decreasing order) of num_shift position.
 // EX. vect = {3,7,2,5,2} num_shift = 2 -> vect = {3,7,2,5,2}.
-inline void UINT64_vect_up_shift(vector<uint64_t>& vect, uint64_t num_shift){
-  vector<uint64_t> tmp(num_shift, UINT64_MAX);
+inline void UINT64_vect_up_shift(std::vector<uint64_t>& vect, uint64_t num_shift){
+  std::vector<uint64_t> tmp(num_shift, UINT64_MAX);
   uint64_t pos;
   for(pos=0; pos<vect.size(); pos++){
     if(pos<num_shift) tmp[pos] = vect[pos];
@@ -190,7 +192,7 @@ uint32_t BSPcomplex::count_cellVertices(const BSPcell& cell,
 //         vector of type edge index: cell_edges.
 // Output: by using cell_edges returns the indices of
 //         the edges (w.r.t. vector edges) of the BSPcell.
-void BSPcomplex::list_cellEdges(BSPcell& cell, vector<uint64_t>& cell_edges){
+void BSPcomplex::list_cellEdges(BSPcell& cell, std::vector<uint64_t>& cell_edges){
 
     uint64_t edge_ind, ce_ind=0;
     for(uint64_t f=0; f<cell.faces.size(); f++){
@@ -214,9 +216,9 @@ void BSPcomplex::list_cellEdges(BSPcell& cell, vector<uint64_t>& cell_edges){
 // Output: by using cell_vrts returns the indices of
 //         the vertices (w.r.t. vector vertices) of the BSPcell.
 void BSPcomplex::list_cellVertices(BSPcell& cell, uint64_t num_cellEdges,
-                                   vector<uint32_t>& cell_vrts){
+                                   std::vector<uint32_t>& cell_vrts){
 
-    vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
+    std::vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
     list_cellEdges(cell, cell_edges);
 
     uint32_t v, cv_ind=0;
@@ -242,7 +244,7 @@ void BSPcomplex::list_cellVertices(BSPcell& cell, uint64_t num_cellEdges,
 //         vector of type vertex index: face_vrts.
 // Output: by using face_vrts returns the indices of
 //         the vertices (w.r.t. vector vertices) of the BSPface.
-void BSPcomplex::list_faceVertices(BSPface& face, vector<uint32_t>& face_vrts){
+void BSPcomplex::list_faceVertices(BSPface& face, std::vector<uint32_t>& face_vrts){
 
     uint32_t fv_ind=0;
 
@@ -280,8 +282,8 @@ void BSPcomplex::list_faceVertices(BSPface& face, vector<uint32_t>& face_vrts){
 //         of cell's edges,
 //         by using cell_vrts returns the indices (w.r.t. vector vertices)
 //         of cell's vertices,
-void BSPcomplex::fill_cell_locDS(BSPcell& cell, vector<uint64_t>& cell_edges,
-                                 vector<uint32_t>& cell_vrts){
+void BSPcomplex::fill_cell_locDS(BSPcell& cell, std::vector<uint64_t>& cell_edges,
+                                 std::vector<uint32_t>& cell_vrts){
 
   uint64_t edge_ind, ce_ind=0, cv_ind=0;
   uint32_t e0, e1;
@@ -359,7 +361,7 @@ uint64_t BSPcomplex::count_cellFaces_inc_cellVrt(const BSPcell& cell, uint32_t v
 //
 //
 void BSPcomplex::cell_VFrelation(const BSPcell& cell, uint32_t v,
-                                 vector<uint64_t>& v_incFaces_ind){
+                                 std::vector<uint64_t>& v_incFaces_ind){
   uint64_t k=0;
   for(const uint64_t fi : cell.faces)
       for(const uint64_t ei : faces[fi].edges)
@@ -373,7 +375,7 @@ void BSPcomplex::cell_VFrelation(const BSPcell& cell, uint32_t v,
 //
 //
 void BSPcomplex::COMPL_cell_VFrelation(const BSPcell& cell, uint32_t v,
-                                      vector<uint64_t>& v_NOT_incFaces_ind){
+                                      std::vector<uint64_t>& v_NOT_incFaces_ind){
     uint64_t k = 0;
     for(const uint64_t fi : cell.faces){
         bool has_edge = false;
@@ -428,7 +430,7 @@ bool isVertexBuiltFromPlane(const genericPoint* v,
 // Output: by using the global vector vrts_orBin returns the orientations of
 //         each point of vrts_inds w.r.t. the plane for
 //         {plane_pt0, plane_pt1, plane_pt2}.
-void BSPcomplex::vrts_orient_wrtPlane(const vector<uint32_t>& vrts_inds,
+void BSPcomplex::vrts_orient_wrtPlane(const std::vector<uint32_t>& vrts_inds,
                 uint32_t plane_pt0, uint32_t plane_pt1, uint32_t plane_pt2,
                 uint32_t count){
 
@@ -446,7 +448,7 @@ void BSPcomplex::vrts_orient_wrtPlane(const vector<uint32_t>& vrts_inds,
 
 //  Input:
 // Output:
-inline void BSPcomplex::count_vrt_orBin(const vector<uint32_t>& inds,
+inline void BSPcomplex::count_vrt_orBin(const std::vector<uint32_t>& inds,
                                 uint32_t* pos, uint32_t* neg, uint32_t* zero){
 
   (*pos)=0;
@@ -469,7 +471,7 @@ inline void BSPcomplex::count_vrt_orBin(const vector<uint32_t>& inds,
 // Output: true if the constraint intersects the edge interior,
 //         false otherwise.
 inline bool BSPcomplex::constraint_innerIntersects_edge(const BSPedge& e,
-                                            const vector<uint32_t>& cell_vrts){
+                                            const std::vector<uint32_t>& cell_vrts){
   return OPPOSITE_SIGNE(vrts_orBin[ e.vertices[0] ], vrts_orBin[ e.vertices[1] ]);
 }
 
@@ -477,7 +479,7 @@ inline bool BSPcomplex::constraint_innerIntersects_edge(const BSPedge& e,
 // Output: true if the constraint intersects the face interior,
 //         false otherwise.
 inline bool BSPcomplex::constraint_innerIntersects_face(
-                                             const vector<uint32_t>& face_vrts){
+                                             const std::vector<uint32_t>& face_vrts){
 
   // Face vertices disposition w.r.t. constraint-plane.
   uint32_t vrtsOVER, vrtsUNDER, vrtsON;
@@ -609,7 +611,7 @@ int localizedPointInTriangle(const genericPoint& P, const genericPoint& A,
 // Output: by using new_order returns new cells indexing (the same as Delaunay
 //         tetrahedra indexing, but without ghost-tets).
 uint64_t BSPcomplex::removing_ghost_tets(const TetMesh* mesh,
-                                         vector<uint64_t>& new_order){
+                                         std::vector<uint64_t>& new_order){
   // new_order have as many element as mesh->numTets(),
   // new_order[i-th tet] =
   //    i - (num of ghost_tet between 0 and i) IF i-th tet is non-ghost
@@ -635,7 +637,7 @@ uint64_t BSPcomplex::removing_ghost_tets(const TetMesh* mesh,
 // Note. tetrahedra are added in crescent index order.
 uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
                                  uint64_t tet_ind,
-                                 const vector<uint64_t>& new_order){
+                                 const std::vector<uint64_t>& new_order){
     uint64_t min = UINT64_MAX;
     static thread_local std::vector<uint64_t> et; et.clear();
     mesh->ETfast(e0, e1, tet_ind, et);
@@ -749,11 +751,11 @@ inline void BSPcomplex::fill_face_colour(uint64_t tet_ind, uint64_t face_ind,
 //        v2 = cpx->vertices[v2_id];
 //        if (genericPoint::misaligned(*v0, *v1, *v2)) break;
 //    }
-//    if (i == f.edges.size()) ip_error("Degenerate face\n");
+//    if (i == f.edges.size()) NFG::ip_error("Degenerate face\n");
 //
 //    uint64_t num_cellEdges = UINT64_MAX;
 //    uint32_t num_cellVrts = cpx->count_cellVertices(c, &num_cellEdges);
-//    vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
+//    std::vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
 //    cpx->list_cellVertices(c, num_cellEdges, cell_vrts);
 //    for (uint32_t vi : cell_vrts) if (!cpx->faceHasVertex(f, vi))
 //    {
@@ -763,7 +765,7 @@ inline void BSPcomplex::fill_face_colour(uint64_t tet_ind, uint64_t face_ind,
 //        if (ori == 0) continue;
 //        return (ori < 0);
 //    }
-//    ip_error("Degenerate cell\n");
+//    NFG::ip_error("Degenerate cell\n");
 //}
 //
 //// Returns the index of the v_ind'th vertex in f.
@@ -817,7 +819,7 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   }
 
   // Establish new tetrahedtra-(cell) indexing: only non-ghost cell are indexed.
-  vector<uint64_t> new_order(mesh->numTets(), UINT64_MAX);
+  std::vector<uint64_t> new_order(mesh->numTets(), UINT64_MAX);
   uint64_t cell_num = removing_ghost_tets(mesh, new_order);
 
   // Creating as many empty cells as the number of non-ghost tet_
@@ -939,7 +941,7 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   // Verify that conn_cell[0] is below the face for every face
   //for (size_t fid = 0; fid < faces.size(); fid++)
   //    if (!faceHasCorrectOrientation(this, fid))
-  //        ip_error("Wrong orientation\n");
+  //        NFG::ip_error("Wrong orientation\n");
 }
 
 //-BSP subdivision----------------------
@@ -1008,7 +1010,7 @@ void BSPcomplex::edgesPartition(uint64_t face_ind, uint64_t newFace_ind){
       const uint32_t comm_vert = (edge.vertices[0] == nedge.vertices[0] || edge.vertices[0] == nedge.vertices[1]) ? 0 : 1;
       if (vrts_orBin[edge.vertices[comm_vert]] < 0 && vrts_orBin[edge.vertices[!comm_vert]] == 0) break;
   }
-  if (e == face.edges.size()) ip_error("pippo1\n");
+  if (e == face.edges.size()) NFG::ip_error("pippo1\n");
 
   std::rotate(face.edges.begin(), face.edges.begin() + e, face.edges.end());
 
@@ -1018,7 +1020,7 @@ void BSPcomplex::edgesPartition(uint64_t face_ind, uint64_t newFace_ind){
       const BSPedge& edge = edges[edge_ind];
       if (vrts_orBin[edge.vertices[0]] == 0 || vrts_orBin[edge.vertices[1]] == 0) break;
   }
-  if (e == face.edges.size()) ip_error("pippo2\n");
+  if (e == face.edges.size()) NFG::ip_error("pippo2\n");
   e++;
   // Move tail edges to new face
   faces[newFace_ind].edges.assign(face.edges.begin() + e, face.edges.end());
@@ -1048,7 +1050,7 @@ void BSPcomplex::edgesPartition(uint64_t face_ind, uint64_t newFace_ind){
 //         of the BSPcell to which the BSPface belong to: cell_vrts.
 // Output: nothing.
 void BSPcomplex::facesPartition(uint64_t cell_ind, uint64_t newCell_ind,
-                                const vector<uint32_t>& cell_vrts){
+                                const std::vector<uint32_t>& cell_vrts){
 
   // Faces whose indices (w.r.t. vector faces) are listed in
   // cells[cell_ind].faces have to be partitioned between
@@ -1060,7 +1062,7 @@ void BSPcomplex::facesPartition(uint64_t cell_ind, uint64_t newCell_ind,
      face_ind = cell.faces[f];
      BSPface& face = faces[face_ind];
 
-     vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+     std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
      list_faceVertices(face, face_vrts);
 
      // Face vertices disposition w.r.t. constraint-plane.
@@ -1118,7 +1120,7 @@ void BSPcomplex::facesPartition(uint64_t cell_ind, uint64_t newCell_ind,
 void BSPcomplex::constraintsPartition(uint32_t ref_constr,
                                       uint64_t down_cell_ind,
                                       uint64_t up_cell_ind,
-                                      const vector<uint32_t>& cell_vrts){
+                                      const std::vector<uint32_t>& cell_vrts){
 
   // At this point down sub-cell has all the constraints,
   // while up sub-cell has none.
@@ -1128,7 +1130,7 @@ void BSPcomplex::constraintsPartition(uint32_t ref_constr,
   #ifdef DEBUG_BSP_DEEP
   printf("\tCurrent constraint is: ");
   print_constraint(constraints_vrts, ref_constr);
-  vector<uint32_t> vrts_to_print;
+  std::vector<uint32_t> vrts_to_print;
   for(uint32_t v=0; v<cell_vrts.size(); v++)
     if(vrts_orBin[cell_vrts[v]] >= 0) vrts_to_print.push_back(cell_vrts[v]);
   print_BSPcell_vrts(vrts_to_print, up_cell_ind);
@@ -1152,7 +1154,7 @@ void BSPcomplex::constraintsPartition(uint32_t ref_constr,
 
   uint64_t num_constr = down_cell.constraints.size();
   uint32_t constr, constr_ID;
-  vector<uint32_t> constr_vrts(3, UINT32_MAX);
+  std::vector<uint32_t> constr_vrts(3, UINT32_MAX);
   for(uint32_t c=0; c<num_constr; c++){
       constr = down_cell.constraints[c];
       constr_ID = 3*constr;
@@ -1329,10 +1331,10 @@ void BSPcomplex::add_commonEdge(uint32_t constr, uint64_t face_ind,
 //         BSPface: edges_ind.
 // Output: nothing.
 void BSPcomplex::add_edges_toCommFaceEdges(BSPface& face,
-                                       const vector<uint64_t>& edges_ind){
+                                       const std::vector<uint64_t>& edges_ind){
   // Find face vertices: since the face boundary is closed,
   //                     there are as many vertices as are the edges.
-  vector<uint32_t> face_vrts(edges_ind.size(), UINT32_MAX);
+  std::vector<uint32_t> face_vrts(edges_ind.size(), UINT32_MAX);
   uint64_t edge_ind;
   uint32_t e0, e1, fv_ind=0;
   for(uint64_t e=0; e<edges_ind.size(); e++){
@@ -1350,7 +1352,7 @@ void BSPcomplex::add_edges_toCommFaceEdges(BSPface& face,
   }
 
   //Relate each face vertex with its two incident edges.
-  vector<uint64_t> rel_VE(2*face_vrts.size(), UINT64_MAX);
+  std::vector<uint64_t> rel_VE(2*face_vrts.size(), UINT64_MAX);
 
   // Set vrts_visit of face_vrts indices in order to memory positions.
   for(uint32_t u=0; u<face_vrts.size(); u++)
@@ -1414,8 +1416,8 @@ void BSPcomplex::add_edges_toCommFaceEdges(BSPface& face,
 // Output: nothing.
 void BSPcomplex::add_commonFace(uint32_t constr,
                                 uint64_t cell_ind, uint64_t newCell_ind,
-                                const vector<uint32_t>& cell_vrts,
-                                const vector<uint64_t>& cell_edges){
+                                const std::vector<uint32_t>& cell_vrts,
+                                const std::vector<uint64_t>& cell_edges){
   // Common face between up-subcell and down-subcell: the edge of that face
   // are those of cells[cell_ind] that have vrts_orBin = 0.
   uint32_t constr_ID = 3*constr;
@@ -1436,7 +1438,7 @@ void BSPcomplex::add_commonFace(uint32_t constr,
           num_commFace_edges++;
   }
   // Fill a vector with those edges.
-  vector<uint64_t> commFace_edges(num_commFace_edges, UINT64_MAX);
+  std::vector<uint64_t> commFace_edges(num_commFace_edges, UINT64_MAX);
   num_commFace_edges = 0;
   for(uint64_t e=0; e<cell_edges.size(); e++){
       edge_ind = cell_edges[e];
@@ -1508,7 +1510,7 @@ void BSPcomplex::fixCommonFaceOrientation(uint64_t cf_id)
             return;
         }
     }
-    ip_error("Degenerate face\n");
+    NFG::ip_error("Degenerate face\n");
 }
 
 //  Input: a BSPedge: edge,
@@ -1717,7 +1719,7 @@ void BSPcomplex::splitEdge(uint64_t edge_id, uint32_t constr){
 //         a vector with the indices of the face vertices: face_vrts.
 // Output: nothing.
 void BSPcomplex::splitFace(uint64_t face_ind, uint32_t constr,
-                          uint64_t cell_ind, const vector<uint32_t>& face_vrts){
+                          uint64_t cell_ind, const std::vector<uint32_t>& face_vrts){
 
   #ifdef DEBUG_BSP_DEEP
   printf("\n\tDividing face #%llu with constraint %u.\n", face_ind, constr);
@@ -1775,14 +1777,14 @@ void BSPcomplex::splitFace(uint64_t face_ind, uint32_t constr,
   add_commonEdge(constr, face_ind, newFace_ind, zero_vrts);
 
 
-  //if (!faceHasCorrectOrientation(this, face_ind)) ip_error("Wrong f1\n");
-  //if (!faceHasCorrectOrientation(this, newFace_ind)) ip_error("Wrong f2\n");
+  //if (!faceHasCorrectOrientation(this, face_ind)) NFG::ip_error("Wrong f1\n");
+  //if (!faceHasCorrectOrientation(this, newFace_ind)) NFG::ip_error("Wrong f2\n");
 }
 
 //
 //
 void BSPcomplex::find_coplanar_constraints(uint64_t cell_ind, uint32_t constr,
-                                               vector<uint32_t>& coplanar_c){
+                                               std::vector<uint32_t>& coplanar_c){
   BSPcell& cell = cells[cell_ind];
   uint32_t constr_ID = 3*constr;
   uint32_t c0 = constraints_vrts[constr_ID  ];
@@ -1791,7 +1793,7 @@ void BSPcomplex::find_coplanar_constraints(uint64_t cell_ind, uint32_t constr,
 
   // Count coplanar constraints.
   uint32_t num_coplanar = 0;
-  vector<uint32_t> k_vrts(3, UINT32_MAX);
+  std::vector<uint32_t> k_vrts(3, UINT32_MAX);
   for(uint32_t k=0; k < cell.constraints.size(); k++){
       if (is_virtual(cell.constraints[k])) continue;
       uint32_t kID = 3*cell.constraints[k];
@@ -1861,8 +1863,8 @@ void BSPcomplex::splitCell(uint64_t cell_ind)
     // rebuild dominates the run time.
     uint64_t num_cellEdges = count_cellEdges(cell);
     uint64_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
-    vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
-    vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
+    std::vector<uint64_t> cell_edges(num_cellEdges, UINT64_MAX);
+    std::vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
     fill_cell_locDS(cell, cell_edges, cell_vrts);
 
     uint32_t constr = UINT32_MAX, c0 = 0, c1 = 0, c2 = 0;
@@ -1911,7 +1913,7 @@ void BSPcomplex::splitCell(uint64_t cell_ind)
     if (!splits) return;
 
     // Search for coplanar constraints.
-    vector<uint32_t> coplanar_constr;
+    std::vector<uint32_t> coplanar_constr;
     find_coplanar_constraints(cell_ind, constr, coplanar_constr);
 
     // (else) CASE. SPLIT-INTERIOR:
@@ -1931,7 +1933,7 @@ void BSPcomplex::splitCell(uint64_t cell_ind)
             vrts_orBin[new_vrt] = 0;
 
 #ifdef DEBUG_BSP_DEEP
-            vector<uint32_t> vrt_to_print;
+            std::vector<uint32_t> vrt_to_print;
             vrt_to_print.push_back(new_vrt);
             printf("\n");
             print_vrt_orBin(vrts_orBin, vrt_to_print);
@@ -1947,7 +1949,7 @@ void BSPcomplex::splitCell(uint64_t cell_ind)
     for (uint64_t f = 0; f < num_faces; f++) {
         uint64_t face_ind = cell.faces[f];
         BSPface& face = faces[face_ind];
-        vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+        std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
         list_faceVertices(face, face_vrts);
 
         if (constraint_innerIntersects_face(face_vrts)) {
@@ -2144,7 +2146,7 @@ void BSPcomplex::triangulateFace(uint64_t face_ind){
 // Output: nothing.
 // Note. a point representing the baricenter (or its approximation) is created
 //       and added to the vector vertices.
-void BSPcomplex::computeBaricenter(const vector<uint32_t>& vrts){
+void BSPcomplex::computeBaricenter(const std::vector<uint32_t>& vrts){
     double cx, cy, cz;
     double sum_x=0.0, sum_y=0.0, sum_z=0.0;
     uint32_t np = 0;
@@ -2162,7 +2164,7 @@ void BSPcomplex::computeBaricenter(const vector<uint32_t>& vrts){
     vrts_visit.push_back(0);
 }
 
-genericPoint* BSPcomplex::createExactBarycenter(const vector<uint32_t>& vrts) {
+genericPoint* BSPcomplex::createExactBarycenter(const std::vector<uint32_t>& vrts) {
     //
     // 1) Pick two vertices
     // 2) Pick a third vertex which is not aligned with the first two
@@ -2230,7 +2232,7 @@ uint64_t BSPcomplex::triFace_shareEdge(const BSPcell& cell, uint64_t face_ind,
 //
 bool BSPcomplex::cell_is_tetrahedrizable_from_v(const BSPcell& cell, uint32_t v){
   uint64_t num_incFaces = count_cellFaces_inc_cellVrt(cell, v);
-  vector<uint64_t> v_incFaces(num_incFaces, UINT64_MAX);
+  std::vector<uint64_t> v_incFaces(num_incFaces, UINT64_MAX);
   cell_VFrelation(cell, v, v_incFaces);
 
   //bool return_zero = false;
@@ -2279,7 +2281,7 @@ void BSPcomplex::makeTetrahedra()
 
           uint64_t num_cellEdges = UINT64_MAX;
           uint32_t num_cellVrts = count_cellVertices(cell, &num_cellEdges);
-          vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
+          std::vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
           list_cellVertices(cell, num_cellEdges, cell_vrts);
 
           // Check if cell is tetrahedralizable from a vertex.
@@ -2316,7 +2318,7 @@ void BSPcomplex::makeTetrahedra()
         BSPcell& cell = cells[cell_i];
         if (cell.place != INTERNAL_A) continue;
         if(decomposition_type[cell_i] == 0){ // Simple tet
-        vector<uint32_t> cell_vrts(4, UINT32_MAX);
+        std::vector<uint32_t> cell_vrts(4, UINT32_MAX);
         list_cellVertices(cells[cell_i], 6, cell_vrts);
         final_tets.insert(final_tets.end(), cell_vrts.begin(), cell_vrts.end());
        }
@@ -2324,11 +2326,11 @@ void BSPcomplex::makeTetrahedra()
         uint32_t v = decomposition_vrt[cell_i];
         uint64_t num_incFaces = count_cellFaces_inc_cellVrt(cells[cell_i], v);
         uint64_t num_NOT_incFaces = cells[cell_i].faces.size() - num_incFaces;
-        vector<uint64_t> v_NOT_incFaces(num_NOT_incFaces, UINT64_MAX);
+        std::vector<uint64_t> v_NOT_incFaces(num_NOT_incFaces, UINT64_MAX);
         COMPL_cell_VFrelation(cells[cell_i], v, v_NOT_incFaces);
         for(uint64_t face_i : v_NOT_incFaces){
           // Simple triangle
-          vector<uint32_t> face_vrts(3, UINT32_MAX);
+          std::vector<uint32_t> face_vrts(3, UINT32_MAX);
           list_faceVertices(faces[face_i], face_vrts);
           final_tets.insert(final_tets.end(), face_vrts.begin(), face_vrts.end());
           final_tets.push_back(v);
@@ -2337,7 +2339,7 @@ void BSPcomplex::makeTetrahedra()
       else{ // Uses cell barycenter
         for(uint64_t face_i : cells[cell_i].faces) {
           // Simple triangle
-          vector<uint32_t> face_vrts(3, UINT32_MAX);
+          std::vector<uint32_t> face_vrts(3, UINT32_MAX);
           list_faceVertices(faces[face_i], face_vrts);
           final_tets.insert(final_tets.end(), face_vrts.begin(), face_vrts.end());
           final_tets.push_back(decomposition_vrt[cell_i]);
@@ -2446,7 +2448,7 @@ bool sameCoordinates(double c1[3], double c2[3], double tol) {
 // TRUE if triangular face has coordinates crds (for debug purposes)
 bool BSPcomplex::hasFaceCoordinates(uint64_t face_ind, double crds[9], double tolerance) {
     const BSPface& face = faces[face_ind];
-    vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+    std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
     list_faceVertices((BSPface&)face, face_vrts);
     if (face_vrts.size() != 3) return false;
 
@@ -2473,7 +2475,7 @@ COLOUR_T BSPcomplex::blackAB_or_white(uint64_t face_ind, bool two_input){
 
   // 1) The face is convex. Pick the first two vertices v1 and v2, and pick one other face
   //    vertex v3 s.t. orient2d(v1,v2,v3,xyz) is not zero.
-  vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+  std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
   list_faceVertices((BSPface &)face, face_vrts);
   genericPoint* v1, * v2, * v3;
   v1 = vertices[face_vrts[0]], v2 = vertices[face_vrts[1]];
@@ -2672,7 +2674,7 @@ void BSPcomplex::extractSkinTriMesh(const char* filename, const char bool_opcode
     }
 
     // Set "internal" depending on bool_opcode and find border faces to save
-    vector<uint64_t> mark(faces.size(), 0);
+    std::vector<uint64_t> mark(faces.size(), 0);
     for (BSPcell& cell : cells)
         if (cell.place == INTERNAL_A)
             for (uint64_t fi = 0; fi < cell.faces.size(); fi++)
@@ -2714,7 +2716,7 @@ void BSPcomplex::extractSkinTriMesh(const char* filename, const char bool_opcode
     for (uint32_t f_i = 0, i = 0; f_i < faces.size(); f_i++)
         if (mark[f_i] == 1) {
             BSPface& face = faces[f_i];
-            vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+            std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
             list_faceVertices(face, face_vrts);
 
             if (cells[face.conn_cells[0]].place == INTERNAL_A)
@@ -2749,7 +2751,7 @@ void BSPcomplex::saveSkin(const char *filename, const char bool_opcode, bool tri
     }
 
     // Set "internal" depending on bool_opcode and find border faces to save
-    vector<uint64_t> mark(faces.size(), 0);
+    std::vector<uint64_t> mark(faces.size(), 0);
     for (BSPcell& cell : cells)
             if (cell.place == INTERNAL_A)
                 for (uint64_t fi = 0; fi < cell.faces.size(); fi++)
@@ -2778,7 +2780,7 @@ void BSPcomplex::saveSkin(const char *filename, const char bool_opcode, bool tri
     ofstream f(filename);
 
     if (!f)
-        ip_error("BSPcomplex::saveSkin: cannot open the file.\n");
+        NFG::ip_error("BSPcomplex::saveSkin: cannot open the file.\n");
 
     f << "OFF\n";
     f << num_v << " ";
@@ -2793,7 +2795,7 @@ void BSPcomplex::saveSkin(const char *filename, const char bool_opcode, bool tri
     for (uint32_t f_i = 0; f_i < faces.size(); f_i++)
         if (mark[f_i] == 1) {
             BSPface& face = faces[f_i];
-            vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+            std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
             list_faceVertices(face, face_vrts);
             f << face_vrts.size();
 
@@ -2816,7 +2818,7 @@ void BSPcomplex::saveMesh(const char* filename, const char bool_opcode, bool tet
 {
     ofstream f(filename);
 
-    if (!f) ip_error("\nBSPcomplex::[BSP.cpp]saveTetMesh: FATAL ERROR cannot open the file.\n");
+    if (!f) NFG::ip_error("\nBSPcomplex::[BSP.cpp]saveTetMesh: FATAL ERROR cannot open the file.\n");
 
     const uint64_t num_faces = faces.size();
 
@@ -2923,7 +2925,7 @@ void BSPcomplex::saveBlackFaces(const char* filename, bool triangulate) {
     ofstream f(filename);
 
     if (!f)
-        ip_error("BSPcomplex::saveBlackFaces: cannot open the file.\n");
+        NFG::ip_error("BSPcomplex::saveBlackFaces: cannot open the file.\n");
 
     if (triangulate)
     {
@@ -2964,7 +2966,7 @@ void BSPcomplex::saveBlackFaces(const char* filename, bool triangulate) {
     for (uint32_t f_i = 0; f_i < faces.size(); f_i++)
         if (faces[f_i].colour != WHITE) {
             BSPface& face = faces[f_i];
-            vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
+            std::vector<uint32_t> face_vrts(face.edges.size(), UINT32_MAX);
             list_faceVertices(face, face_vrts);
             f << face_vrts.size();
 

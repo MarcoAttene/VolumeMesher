@@ -7,6 +7,8 @@
 #include "graph_cut/LinkedBlockList.cpp"
 #include "graph_cut/GCoptimization.cpp"
 
+using namespace IPs;
+
 // Label = 1 means INTERNAL
 // Label = 0 means EXTERNAL
 
@@ -38,7 +40,7 @@ bool isFirstConnCellBelowFace(BSPface& f, BSPcomplex* cpx)
         }
     }
 
-    ip_error("Degenerate cell\n");
+    NFG::ip_error("Degenerate cell\n");
     return false;
 }
 

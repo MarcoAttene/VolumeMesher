@@ -66,8 +66,8 @@ void remove_duplicated_points(vertex_t** vertices_p, uint32_t* npts,
 /// //////////////////////////////////////////////////////////////////////////////////////////
 
 bool misAlignment(const double* p, const double* q, const double* r) {
-    explicitPoint3D ep(p[0], p[1], p[2]), eq(q[0], q[1], q[2]), er(r[0], r[1], r[2]);
-    return explicitPoint3D::misaligned(ep, eq, er);
+    IPs::explicitPoint3D ep(p[0], p[1], p[2]), eq(q[0], q[1], q[2]), er(r[0], r[1], r[2]);
+    return IPs::explicitPoint3D::misaligned(ep, eq, er);
 }
 
 void read_nodes_and_constraints(double* coords_A, uint32_t npts_A, uint32_t* tri_idx_A, uint32_t ntri_A,
@@ -346,7 +346,7 @@ BSPcomplex* makePolyhedralMesh(
             if (bool_opcode == 'U') printf(" union.\n\n");
             else if (bool_opcode == 'I') printf(" intersection.\n\n");
             else if (bool_opcode == 'D') printf(" difference.\n\n");
-            else { ip_error("INVALID\n\n"); }
+            else { NFG::ip_error("INVALID\n\n"); }
         }
     }
 
@@ -387,8 +387,8 @@ BSPcomplex* makePolyhedralMesh(
 
     free(vertices);
 
-    if (mesh->numVertices() < 4) ip_error("Cannot mesh less than 4 vertices.");
-    if (constraints->num_triangles < 1) ip_error("No non-degenerate constraints loaded.");
+    if (mesh->numVertices() < 4) NFG::ip_error("Cannot mesh less than 4 vertices.");
+    if (constraints->num_triangles < 1) NFG::ip_error("No non-degenerate constraints loaded.");
 
     if (free_mem)
     {
@@ -499,8 +499,6 @@ BSPcomplex* makePolyhedralMesh(
 
     double DEL_time = (double)(time4 - time0) / CLOCKS_PER_SEC;
     if (verbose) printf("TOTAL Delaunay+map: %f s\n\n", DEL_time);
-
-    initFPU(); // From here on we need indirect predicates
 
     //-Init BSP with mesh and constraints---------------------------------------
     BSPcomplex* complex_p = new BSPcomplex(mesh, constraints, (const uint32_t**)map, num_map, (const uint32_t**)map_f0, num_map_f0,
