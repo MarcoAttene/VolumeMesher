@@ -92,16 +92,8 @@ public:
     BSPface(){}
 
     // Face (general) constructor
-    BSPface(uint32_t m_v1, uint32_t m_v2, uint32_t m_v3,
-            uint64_t c1, uint64_t c2){
-
-        meshVertices[0] = m_v1;
-        meshVertices[1] = m_v2;
-        meshVertices[2] = m_v3;
-
-        conn_cells[0] = c1;
-        conn_cells[1] = c2;
-    }
+    BSPface(uint32_t m_v1, uint32_t m_v2, uint32_t m_v3, uint64_t c1, uint64_t c2) 
+        : meshVertices{ m_v1, m_v2, m_v3 }, conn_cells{ c1, c2 } { }
 
     size_t getSize() const
     {
@@ -151,7 +143,7 @@ public:
     uint32_t place = UNDEFINED;  // Internal, external or undefined (see macros)
                                  // w.r.t. constraints surface.
 
-    BSPcell(){}
+    BSPcell() { faces.reserve(4); }
 
     BSPcell(const std::vector<uint64_t>& cell_faces){
         faces.assign(cell_faces.begin(), cell_faces.end());
@@ -277,7 +269,12 @@ class BSPcomplex{
     // Upload Delaunay triangolation
     uint64_t removing_ghost_tets(const TetMesh* mesh, std::vector<uint64_t>& new_order);
     uint64_t add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
-                         uint64_t tet_ind, const std::vector<uint64_t>& new_order);
+        uint64_t tet_ind, const std::vector<uint64_t>& new_order);
+
+    uint64_t add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
+        const std::vector<std::vector<uint32_t>>& total_vv, std::vector<std::vector<uint32_t>>& bsp_edges);
+
+
     inline uint64_t add_tetFace(uint32_t v0, uint32_t v1, uint32_t v2,
                          uint64_t cell_ind, uint64_t adjCell_ind);
     inline bool tet_face_isNew(uint64_t tet_ind, uint64_t adjTet_ind,

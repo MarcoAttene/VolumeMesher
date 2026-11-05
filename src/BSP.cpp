@@ -635,15 +635,24 @@ uint64_t BSPcomplex::removing_ghost_tets(const TetMesh* mesh,
 // Output: the index of the edge (w.r.t. the vector edges) of the
 //         edge <endpt0, endpt1>.
 // Note. tetrahedra are added in crescent index order.
+
 uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
                                  uint64_t tet_ind,
                                  const std::vector<uint64_t>& new_order){
-    uint64_t min = UINT64_MAX;
-    static thread_local std::vector<uint64_t> et; et.clear();
-    mesh->ETfast(e0, e1, tet_ind, et);
-    for (uint64_t t : et) if (t < min) min = t;
+    // Search min-index tet in ET(e0,e1)
+    uint64_t prev_t = UINT64_MAX, next_t, cur_t = tet_ind, min_t = tet_ind;
+    do {
+        const uint64_t tb = cur_t * 4;
+        if (mesh->tet_node[tb + 3] != INFINITE_VERTEX && cur_t < min_t) min_t = cur_t;
+        for (int i = 0; i < 4; i++) {
+            next_t = mesh->tet_neigh[tb + i] >> 2;
+            if (next_t != prev_t && mesh->tetHasVertex(next_t, e0) && mesh->tetHasVertex(next_t, e1)) break;
+        }
+        prev_t = cur_t;
+        cur_t = next_t;
+    } while (cur_t != tet_ind);
 
-    if(min == tet_ind){
+    if(min_t == tet_ind){
       // None of the tetrahedra incident in <e0,e1> has been visited,
       // furthermore the edge <e0,e1> do not belongs to a face of tet_ind
       // (as a consequence of the constructor BSPcomplex).
@@ -654,13 +663,13 @@ uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
 
     uint64_t edge_ind;
     for(uint64_t f=0; f<4; f++){        // Note. also with f<3 sholud work.
-      BSPface& face = faces[ cells[ new_order[min] ].faces[f] ];
+      const BSPface& face = faces[ cells[ new_order[min_t] ].faces[f] ];
       for(uint64_t e=0; e<3; e++){
         edge_ind = face.edges[e];
-        BSPedge& edge = edges[edge_ind];
+        const BSPedge& edge = edges[edge_ind];
         if(SAME_EDGE_ENDPTS(e0, e1, edge.vertices[0], edge.vertices[1]) ) break;
       }
-      BSPedge& edge = edges[edge_ind];
+      const BSPedge& edge = edges[edge_ind];
       if(SAME_EDGE_ENDPTS(e0, e1, edge.vertices[0], edge.vertices[1]) ) break;
     }
     return edge_ind;
@@ -675,8 +684,8 @@ uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
 inline uint64_t BSPcomplex::add_tetFace(uint32_t v0, uint32_t v1, uint32_t v2,
                                       uint64_t cell_ind, uint64_t adjCell_ind){
   // Note. adjCell==UINT64_MAX -> convex-hull face.
+  uint64_t face_ind = faces.size();
   faces.push_back( BSPface(v0,v1,v2, cell_ind,adjCell_ind) );
-  uint64_t face_ind = faces.size() -1;
   cells[cell_ind].faces.push_back(face_ind);
   if(!IS_GHOST_CELL(adjCell_ind))  cells[adjCell_ind].faces.push_back(face_ind);
 
@@ -726,66 +735,22 @@ inline void BSPcomplex::fill_face_colour(uint64_t tet_ind, uint64_t face_ind,
   }
 }
 
+uint64_t BSPcomplex::add_tetEdge(const TetMesh* mesh, uint32_t e0, uint32_t e1,
+    const std::vector<std::vector<uint32_t>>& total_vv, std::vector<std::vector<uint32_t>>& bsp_edges) {
 
-//bool faceHasCorrectOrientation(BSPcomplex* cpx, uint64_t f_id)
-//{
-//    const BSPface& f = cpx->faces[f_id];
-//    const uint64_t c_id = f.conn_cells[0];
-//    BSPcell& c = cpx->cells[c_id];
-//    const uint64_t e0_id = f.edges[0];
-//    const uint64_t e1_id = f.edges[1];
-//    const uint64_t e2_id = f.edges[2];
-//    const BSPedge& e0 = cpx->edges[e0_id];
-//    const BSPedge& e1 = cpx->edges[e1_id];
-//    const BSPedge& e2 = cpx->edges[e2_id];
-//    const uint32_t v0_id = cpx->getFaceVertex(f, 0);
-//    const uint32_t v1_id = cpx->getFaceVertex(f, 1);
-//    genericPoint* v0 = cpx->vertices[v0_id];
-//    genericPoint* v1 = cpx->vertices[v1_id];
-//    genericPoint* v2;
-//
-//    size_t i;
-//    for (i = 2; i < f.edges.size(); i++)
-//    {
-//        const uint32_t v2_id = cpx->getFaceVertex(f, i);
-//        v2 = cpx->vertices[v2_id];
-//        if (genericPoint::misaligned(*v0, *v1, *v2)) break;
-//    }
-//    if (i == f.edges.size()) NFG::ip_error("Degenerate face\n");
-//
-//    uint64_t num_cellEdges = UINT64_MAX;
-//    uint32_t num_cellVrts = cpx->count_cellVertices(c, &num_cellEdges);
-//    std::vector<uint32_t> cell_vrts(num_cellVrts, UINT32_MAX);
-//    cpx->list_cellVertices(c, num_cellEdges, cell_vrts);
-//    for (uint32_t vi : cell_vrts) if (!cpx->faceHasVertex(f, vi))
-//    {
-//        genericPoint* ov = cpx->vertices[vi];
-//
-//        int ori = genericPoint::orient3D(*ov, *v0, *v1, *v2);
-//        if (ori == 0) continue;
-//        return (ori < 0);
-//    }
-//    NFG::ip_error("Degenerate cell\n");
-//}
-//
-//// Returns the index of the v_ind'th vertex in f.
-//// Vertex 'i' is the common vertex between edge 'i' and edge 'i+1'%num_edges
-//uint32_t BSPcomplex::getFaceVertex(const BSPface& f, uint32_t v_ind)
-//{
-//    const BSPedge& e0 = edges[f.edges[v_ind]];
-//    const BSPedge& e1 = edges[f.edges[(v_ind + 1) % (f.edges.size())]];
-//    return consecEdges_common_endpt(e0.vertices[0], e0.vertices[1], e1.vertices[0], e1.vertices[1]);
-//}
-//
-//bool BSPcomplex::faceHasVertex(const BSPface& f, uint32_t v_ind)
-//{
-//    for (uint64_t eid : f.edges)
-//    {
-//        const BSPedge& e = edges[eid];
-//        if (e.vertices[0] == v_ind || e.vertices[1] == v_ind) return true;
-//    }
-//    return false;
-//}
+    if (e1 < e0) std::swap(e0, e1);
+    const std::vector<uint32_t>& e0vv = total_vv[e0];
+    auto it = std::find(e0vv.begin(), e0vv.end(), e1);
+    uint32_t& prev_bsp_edge = bsp_edges[e0][it - e0vv.begin()];
+
+    if (prev_bsp_edge == UINT32_MAX) {
+        uint32_t ei = (uint32_t)edges.size();
+        edges.push_back(BSPedge(e0, e1, e0, e1));
+        prev_bsp_edge = ei;
+        return ei;
+    }
+    else return prev_bsp_edge;
+}
 
 //
 // Fills the data scruture with the information of the Delauany mesh.
@@ -825,114 +790,223 @@ BSPcomplex::BSPcomplex(const TetMesh* mesh, const constraints_t* _constraints,
   // Creating as many empty cells as the number of non-ghost tet_
   cells.resize(cell_num);
   edges.reserve(cell_num + mesh->numVertices());
-  faces.reserve(cell_num * 2);
 
+
+
+  // total_vv[vi] stores the total VV relation of vi
+  // Upon creation of a new edge v1-v2, with v1 < v2, we look for
+  // the position 'pos' of v2 in total_vv[v1] and save the new edge index
+  // in bsp_edge[v1][pos] if it does not already contain a valid value.
+  // In the latter case, the pre-stored value is reused.
+  std::vector<std::vector<uint32_t>> total_vv(mesh->numVertices());
+  std::vector<std::vector<uint32_t>> bsp_edge(mesh->numVertices());
+  for (uint32_t vi = 0; vi < mesh->numVertices(); vi++) {
+      mesh->VV(vi, total_vv[vi]);
+      bsp_edge[vi].resize(total_vv[vi].size(), UINT32_MAX);
+  }
 
   // Loading the cells, creating faces and eadges of the BSP:
   // cells -> the non-ghost tetrahedra in the mesh,
   // faces -> the faces of the non-ghost tetrahedra in the mesh,
   // edges -> the edges of the non-ghost tetrahedra in the mesh.
-  for(uint64_t tet_ind=0; tet_ind<mesh->numTets(); tet_ind++){
-    // Here each BSPcell is a non-ghost tetrahedron of the mesh:
-    // consider a tetrahedron (tet) whose index is tet_ind.
-    uint64_t cell_ind = new_order[tet_ind];
-    if( IS_GHOST_CELL(cell_ind) )   continue; // Skip ghost-tet.
+  for (uint64_t tet_ind = 0; tet_ind < mesh->numTets(); tet_ind++) {
+      // Here each BSPcell is a non-ghost tetrahedron of the mesh:
+      // consider a tetrahedron (tet) whose index is tet_ind.
+      uint64_t cell_ind = new_order[tet_ind];
+      if (IS_GHOST_CELL(cell_ind))   continue; // Skip ghost-tet.
 
-    // Create BSPcells from tetrahedra by following increasing indexing:
-    // all non-ghost tetrahedra which have index lower than tet_ind
-    // have been already turned into BSP cells.
+      // Create BSPcells from tetrahedra by following increasing indexing:
+      // all non-ghost tetrahedra which have index lower than tet_ind
+      // have been already turned into BSP cells.
 
-    // Constraints improperly intersecated by tet.
-    if(num_map[tet_ind]>0){
-      cells[cell_ind].constraints.resize( num_map[tet_ind] );
-      for(uint32_t i=0; i<num_map[tet_ind]; i++)
-        cells[cell_ind].constraints[i] = map[tet_ind][i];
-    }
+      // Constraints improperly intersecated by tet.
 
-    // Adding BSPface and BSPedges to create a BSPcell conformed to tetrahedron.
-    uint32_t v[4]; // Indices of tet vertices.
-    v[0] = mesh->tet_node[4 * tet_ind];
-    v[1] = mesh->tet_node[4 * tet_ind + 1];
-    v[2] = mesh->tet_node[4 * tet_ind + 2];
-    v[3] = mesh->tet_node[4 * tet_ind + 3];
+      cells[cell_ind].constraints.assign(map[tet_ind], map[tet_ind] + num_map[tet_ind]);
 
-    uint64_t face_ind, adjCell_ind, adjTet_ind;
-    uint64_t tet_edge[6];
-    // --- face <v0,v1,v2> -----------------------------
-    adjTet_ind = mesh->tet_neigh[4 * tet_ind + 3] >> 2;
-    adjCell_ind = new_order[adjTet_ind];
-    if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
-        face_ind = add_tetFace(v[0], v[1], v[2], cell_ind, adjCell_ind);
-        // At most three edges may have to be created <v0,v1>, <v1,v2>, <v2,v0>.
-        tet_edge[0] = add_tetEdge(mesh, v[0], v[1], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[0], face_ind);
-        tet_edge[2] = add_tetEdge(mesh, v[2], v[0], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[2], face_ind);
-        tet_edge[1] = add_tetEdge(mesh, v[1], v[2], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[1], face_ind);
-        // Color and coplanar-constraints
-        fill_face_colour(tet_ind, face_ind, map_f3, num_map_f3);
-    }
-    else {
-        face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
-        BSPface& face = faces[face_ind];
-        tet_edge[0] = find_face_edge(face, v[0], v[1]);
-        tet_edge[1] = find_face_edge(face, v[1], v[2]);
-        tet_edge[2] = find_face_edge(face, v[2], v[0]);
-    }
-    // --- face <v3,v0,v1> -----------------------------
-    adjTet_ind = mesh->tet_neigh[4 * tet_ind + 2] >> 2;
-    adjCell_ind = new_order[adjTet_ind];
-    if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
-        face_ind = add_tetFace(v[3], v[0], v[1], cell_ind, adjCell_ind);
-        // At most two edges may have to be created <v3,v0>, <v1,v3>.
-        tet_edge[4] = add_tetEdge(mesh, v[1], v[3], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[4], face_ind);
-        tet_edge[3] = add_tetEdge(mesh, v[3], v[0], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[3], face_ind);
-        // <v0,v1> is tet_edge[0].
-        assigne_edge_to_face(tet_edge[0], face_ind);
-        // Color and coplanar-constraints
-        fill_face_colour(tet_ind, face_ind, map_f2, num_map_f2);
-    }
-    else {
-        face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
-        BSPface& face = faces[face_ind];
-        tet_edge[3] = find_face_edge(face, v[3], v[0]);
-        tet_edge[4] = find_face_edge(face, v[1], v[3]);
-    }
-    // --- face <v2,v3,v0> -----------------------------
-    adjTet_ind = mesh->tet_neigh[4 * tet_ind + 1] >> 2;
-    adjCell_ind = new_order[adjTet_ind];
-    if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
-        face_ind = add_tetFace(v[2], v[3], v[0], cell_ind, adjCell_ind);
-        // At most one edges may have to be created <v2,v3>.
-        tet_edge[5] = add_tetEdge(mesh, v[2], v[3], tet_ind, new_order);
-        assigne_edge_to_face(tet_edge[5], face_ind);
-        // <v3,v0> is tet_edge[3], <v0,v2> is tet_edge[2].
-        assigne_edge_to_face(tet_edge[2], face_ind);
-        assigne_edge_to_face(tet_edge[3], face_ind);
-        // Color and coplanar-constraints
-        fill_face_colour(tet_ind, face_ind, map_f1, num_map_f1);
-    }
-    else {
-        face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
-        tet_edge[5] = find_face_edge(faces[face_ind], v[2], v[3]);
-    }
-    // --- face <v1,v2,v3> -----------------------------
-    adjTet_ind = mesh->tet_neigh[4 * tet_ind] >> 2;
-    adjCell_ind = new_order[adjTet_ind];
-    if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
-        face_ind = add_tetFace(v[1], v[2], v[3], cell_ind, adjCell_ind);
-        // No edges have to be created.
-        // <v1,v2> is tet_edge[1], <v2,v3> is tet_edge[5], <v3,v1> is tet_edge[4].
-        assigne_edge_to_face(tet_edge[1], face_ind);
-        assigne_edge_to_face(tet_edge[5], face_ind);
-        assigne_edge_to_face(tet_edge[4], face_ind);
-        // Color and coplanar-constraints
-        fill_face_colour(tet_ind, face_ind, map_f0, num_map_f0);
-    }
+      // Adding BSPface and BSPedges to create a BSPcell conformed to tetrahedron.
+      const uint64_t tb = tet_ind << 2;
+      const uint32_t* v = mesh->getTetNodes(tb);
+
+      uint64_t face_ind, adjCell_ind, adjTet_ind;
+      uint64_t tet_edge[6];
+      // --- face <v0,v1,v2> -----------------------------
+      adjTet_ind = mesh->tet_neigh[tb + 3] >> 2;
+      adjCell_ind = new_order[adjTet_ind];
+      if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+          face_ind = add_tetFace(v[0], v[1], v[2], cell_ind, adjCell_ind);
+          // At most three edges may have to be created <v0,v1>, <v1,v2>, <v2,v0>.
+          tet_edge[0] = add_tetEdge(mesh, v[0], v[1], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[0], face_ind);
+          tet_edge[2] = add_tetEdge(mesh, v[2], v[0], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[2], face_ind);
+          tet_edge[1] = add_tetEdge(mesh, v[1], v[2], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[1], face_ind);
+          // Color and coplanar-constraints
+          fill_face_colour(tet_ind, face_ind, map_f3, num_map_f3);
+      }
+      else {
+          face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+          BSPface& face = faces[face_ind];
+          tet_edge[0] = find_face_edge(face, v[0], v[1]);
+          tet_edge[1] = find_face_edge(face, v[1], v[2]);
+          tet_edge[2] = find_face_edge(face, v[2], v[0]);
+      }
+      // --- face <v3,v0,v1> -----------------------------
+      adjTet_ind = mesh->tet_neigh[tb + 2] >> 2;
+      adjCell_ind = new_order[adjTet_ind];
+      if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+          face_ind = add_tetFace(v[3], v[0], v[1], cell_ind, adjCell_ind);
+          // At most two edges may have to be created <v3,v0>, <v1,v3>.
+          tet_edge[4] = add_tetEdge(mesh, v[1], v[3], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[4], face_ind);
+          tet_edge[3] = add_tetEdge(mesh, v[3], v[0], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[3], face_ind);
+          // <v0,v1> is tet_edge[0].
+          assigne_edge_to_face(tet_edge[0], face_ind);
+          // Color and coplanar-constraints
+          fill_face_colour(tet_ind, face_ind, map_f2, num_map_f2);
+      }
+      else {
+          face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+          BSPface& face = faces[face_ind];
+          tet_edge[3] = find_face_edge(face, v[3], v[0]);
+          tet_edge[4] = find_face_edge(face, v[1], v[3]);
+      }
+      // --- face <v2,v3,v0> -----------------------------
+      adjTet_ind = mesh->tet_neigh[tb + 1] >> 2;
+      adjCell_ind = new_order[adjTet_ind];
+      if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+          face_ind = add_tetFace(v[2], v[3], v[0], cell_ind, adjCell_ind);
+          // At most one edges may have to be created <v2,v3>.
+          tet_edge[5] = add_tetEdge(mesh, v[2], v[3], total_vv, bsp_edge);
+          assigne_edge_to_face(tet_edge[5], face_ind);
+          // <v3,v0> is tet_edge[3], <v0,v2> is tet_edge[2].
+          assigne_edge_to_face(tet_edge[2], face_ind);
+          assigne_edge_to_face(tet_edge[3], face_ind);
+          // Color and coplanar-constraints
+          fill_face_colour(tet_ind, face_ind, map_f1, num_map_f1);
+      }
+      else {
+          face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+          tet_edge[5] = find_face_edge(faces[face_ind], v[2], v[3]);
+      }
+      // --- face <v1,v2,v3> -----------------------------
+      adjTet_ind = mesh->tet_neigh[tb] >> 2;
+      adjCell_ind = new_order[adjTet_ind];
+      if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+          face_ind = add_tetFace(v[1], v[2], v[3], cell_ind, adjCell_ind);
+          // No edges have to be created.
+          // <v1,v2> is tet_edge[1], <v2,v3> is tet_edge[5], <v3,v1> is tet_edge[4].
+          assigne_edge_to_face(tet_edge[1], face_ind);
+          assigne_edge_to_face(tet_edge[5], face_ind);
+          assigne_edge_to_face(tet_edge[4], face_ind);
+          // Color and coplanar-constraints
+          fill_face_colour(tet_ind, face_ind, map_f0, num_map_f0);
+      }
   }
+
+
+
+
+ // // Loading the cells, creating faces and eadges of the BSP:
+ // // cells -> the non-ghost tetrahedra in the mesh,
+ // // faces -> the faces of the non-ghost tetrahedra in the mesh,
+ // // edges -> the edges of the non-ghost tetrahedra in the mesh.
+ // for(uint64_t tet_ind=0; tet_ind<mesh->numTets(); tet_ind++){
+ //   // Here each BSPcell is a non-ghost tetrahedron of the mesh:
+ //   // consider a tetrahedron (tet) whose index is tet_ind.
+ //   uint64_t cell_ind = new_order[tet_ind];
+ //   if( IS_GHOST_CELL(cell_ind) )   continue; // Skip ghost-tet.
+
+ //   // Create BSPcells from tetrahedra by following increasing indexing:
+ //   // all non-ghost tetrahedra which have index lower than tet_ind
+ //   // have been already turned into BSP cells.
+
+ //   // Constraints improperly intersecated by tet.
+
+	//cells[cell_ind].constraints.assign(map[tet_ind], map[tet_ind] + num_map[tet_ind]);
+
+ //   // Adding BSPface and BSPedges to create a BSPcell conformed to tetrahedron.
+ //   const uint64_t tb = tet_ind << 2;
+ //   const uint32_t *v = mesh->getTetNodes(tb);
+
+ //   uint64_t face_ind, adjCell_ind, adjTet_ind;
+ //   uint64_t tet_edge[6];
+ //   // --- face <v0,v1,v2> -----------------------------
+ //   adjTet_ind = mesh->tet_neigh[tb + 3] >> 2;
+ //   adjCell_ind = new_order[adjTet_ind];
+ //   if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+ //       face_ind = add_tetFace(v[0], v[1], v[2], cell_ind, adjCell_ind);
+ //       // At most three edges may have to be created <v0,v1>, <v1,v2>, <v2,v0>.
+ //       tet_edge[0] = add_tetEdge(mesh, v[0], v[1], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[0], face_ind);
+ //       tet_edge[2] = add_tetEdge(mesh, v[2], v[0], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[2], face_ind);
+ //       tet_edge[1] = add_tetEdge(mesh, v[1], v[2], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[1], face_ind);
+ //       // Color and coplanar-constraints
+ //       fill_face_colour(tet_ind, face_ind, map_f3, num_map_f3);
+ //   }
+ //   else {
+ //       face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+ //       BSPface& face = faces[face_ind];
+ //       tet_edge[0] = find_face_edge(face, v[0], v[1]);
+ //       tet_edge[1] = find_face_edge(face, v[1], v[2]);
+ //       tet_edge[2] = find_face_edge(face, v[2], v[0]);
+ //   }
+ //   // --- face <v3,v0,v1> -----------------------------
+ //   adjTet_ind = mesh->tet_neigh[tb + 2] >> 2;
+ //   adjCell_ind = new_order[adjTet_ind];
+ //   if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+ //       face_ind = add_tetFace(v[3], v[0], v[1], cell_ind, adjCell_ind);
+ //       // At most two edges may have to be created <v3,v0>, <v1,v3>.
+ //       tet_edge[4] = add_tetEdge(mesh, v[1], v[3], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[4], face_ind);
+ //       tet_edge[3] = add_tetEdge(mesh, v[3], v[0], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[3], face_ind);
+ //       // <v0,v1> is tet_edge[0].
+ //       assigne_edge_to_face(tet_edge[0], face_ind);
+ //       // Color and coplanar-constraints
+ //       fill_face_colour(tet_ind, face_ind, map_f2, num_map_f2);
+ //   }
+ //   else {
+ //       face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+ //       BSPface& face = faces[face_ind];
+ //       tet_edge[3] = find_face_edge(face, v[3], v[0]);
+ //       tet_edge[4] = find_face_edge(face, v[1], v[3]);
+ //   }
+ //   // --- face <v2,v3,v0> -----------------------------
+ //   adjTet_ind = mesh->tet_neigh[tb + 1] >> 2;
+ //   adjCell_ind = new_order[adjTet_ind];
+ //   if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+ //       face_ind = add_tetFace(v[2], v[3], v[0], cell_ind, adjCell_ind);
+ //       // At most one edges may have to be created <v2,v3>.
+ //       tet_edge[5] = add_tetEdge(mesh, v[2], v[3], tet_ind, new_order);
+ //       assigne_edge_to_face(tet_edge[5], face_ind);
+ //       // <v3,v0> is tet_edge[3], <v0,v2> is tet_edge[2].
+ //       assigne_edge_to_face(tet_edge[2], face_ind);
+ //       assigne_edge_to_face(tet_edge[3], face_ind);
+ //       // Color and coplanar-constraints
+ //       fill_face_colour(tet_ind, face_ind, map_f1, num_map_f1);
+ //   }
+ //   else {
+ //       face_ind = faceSharedWithCell(cell_ind, adjCell_ind);
+ //       tet_edge[5] = find_face_edge(faces[face_ind], v[2], v[3]);
+ //   }
+ //   // --- face <v1,v2,v3> -----------------------------
+ //   adjTet_ind = mesh->tet_neigh[tb] >> 2;
+ //   adjCell_ind = new_order[adjTet_ind];
+ //   if (tet_face_isNew(tet_ind, adjTet_ind, adjCell_ind)) {
+ //       face_ind = add_tetFace(v[1], v[2], v[3], cell_ind, adjCell_ind);
+ //       // No edges have to be created.
+ //       // <v1,v2> is tet_edge[1], <v2,v3> is tet_edge[5], <v3,v1> is tet_edge[4].
+ //       assigne_edge_to_face(tet_edge[1], face_ind);
+ //       assigne_edge_to_face(tet_edge[5], face_ind);
+ //       assigne_edge_to_face(tet_edge[4], face_ind);
+ //       // Color and coplanar-constraints
+ //       fill_face_colour(tet_ind, face_ind, map_f0, num_map_f0);
+ //   }
+ // }
 
   // Initialize visit-flag vectors: all the values are set to upper-limit.
   vrts_visit.resize(vertices.size(), 0);

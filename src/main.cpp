@@ -123,9 +123,9 @@ int main(int argc, char** argv)
     bool triangulate = true;
     bool verbose = true;
     bool logging = false;
-    bool surfmesh = false;
+    bool surfmesh = true;
     bool blackfaces = false;
-    const char* fileA_name = "..\\models\\wood_fish.off";
+    const char* fileA_name = "..\\models\\70374.off";
     char* fileB_name = NULL;
     char bool_opcode = '0';
     bool two_input = (bool_opcode != '0');

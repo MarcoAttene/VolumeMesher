@@ -2,10 +2,7 @@
 #include <fstream>
 #include <algorithm>
 #include "BSP.h"
-
-#include "graph_cut/GCoptimization.h"
-#include "graph_cut/LinkedBlockList.cpp"
-#include "graph_cut/GCoptimization.cpp"
+#include "graphcut.h"
 
 using namespace IPs;
 
@@ -87,14 +84,11 @@ inline void setExternalCell(BSPcell& c)
 
 void BSPcomplex::markInternalCells(uint32_t skin_colour, uint32_t internal_label, const std::vector<double>& face_areas)
 {
-    // Allocate dual graph: num cells + 1 to account for the external "ghost" cell
-    GCoptimizationGeneralGraph gc((GCoptimization::SiteID)cells.size() + 1, 2);
-
     // gc is the dual graph of the cell complex
     // - a node in gc corresponds to a cell in the complex
-    // - an arc in gc exists if two cells share a WHITE face
+    // - an edge in gc exists if two cells share a WHITE face
 
-    // In gc, cells that share a white face are connected by an arc weighted on face area
+    // In gc, cells that share a white face are connected by an edge weighted on face area
     // The 'data cost' associated to each cell is:
     //  - total area of BLACK faces 'consistently oriented' with the cell, if label is EXTERNAL
     //  - 0, if label is INTERNAL
@@ -109,7 +103,7 @@ void BSPcomplex::markInternalCells(uint32_t skin_colour, uint32_t internal_label
     // evs == 1 if edge is on boundary of skin
     std::vector<uint8_t> evs(edges.size(), 0);
     for (BSPface& f : faces) if (isSkinFace(f, skin_colour))
-      for (uint64_t eid : f.edges) if (evs[eid] < 2) evs[eid]++;
+        for (uint64_t eid : f.edges) if (evs[eid] < 2) evs[eid]++;
 
     // vvs == 1 if vertex is on boundary of skin
     std::vector<uint8_t> vvs(vertices.size(), 0);
@@ -143,6 +137,9 @@ void BSPcomplex::markInternalCells(uint32_t skin_colour, uint32_t internal_label
         }
     }
 
+    // Allocate dual graph: num cells + 1 to account for the external "ghost" cell
+    GC_Graph gc((int)cells.size() + 1);
+
     for (size_t i = 0; i < faces.size(); i++)
     {
         BSPface& f = faces[i];
@@ -154,21 +151,20 @@ void BSPcomplex::markInternalCells(uint32_t skin_colour, uint32_t internal_label
             double w = 0.1;
             for (uint64_t eid : f.edges) if (vvs[edges[eid].vertices[0]] == 0 || vvs[edges[eid].vertices[1]] == 0) { w = 1.0; break; }
             const uint64_t cell2 = (f.conn_cells[1] == UINT64_MAX) ? (cells.size()) : (f.conn_cells[1]);
-            gc.setNeighbors((GCoptimization::SiteID)cell1, (GCoptimization::SiteID)cell2, face_areas[i]*w);
+            gc.AddEdge((int)cell1, (int)cell2, face_areas[i] * w);
         }
     }
 
     const double int_weight = 0.1; // Internal cell penalization less than external to avoid artifacts at intersections
-    for (size_t i = 0; i < cells.size(); i++) gc.setDataCost((GCoptimization::SiteID)i, 0, cell_costs_external[i]);
-    for (size_t i = 0; i < cells.size(); i++) gc.setDataCost((GCoptimization::SiteID)i, 1, cell_costs_internal[i] * int_weight);
-    gc.setDataCost((GCoptimization::SiteID)cells.size(), 1, 1.0); // Ghost cell must be external
+    for (size_t i = 0; i < cells.size(); i++) gc.AddCapacity((int)i, cell_costs_internal[i] * int_weight, cell_costs_external[i]);
+    gc.AddCapacity((int)cells.size(), 1.0, 0.0); // Ghost cell must be external
 
     // Run graph cut algorithm
     // I.e., label all the cells so that the total data cost + smooth cost is minimized
-    gc.swap();
+    gc.ComputeMaxFlow();
 
     for (size_t i = 0; i < cells.size(); i++)
-        if (gc.whatLabel((GCoptimization::SiteID)i)) setInternalCell(cells[i], internal_label);
+        if (gc.WhichLabel((int)i)) setInternalCell(cells[i], internal_label);
 }
 
 void BSPcomplex::constraintsSurface_complexPartition(bool two_files)

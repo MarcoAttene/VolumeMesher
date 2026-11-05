@@ -6,7 +6,7 @@
 // the whole code which uses this library.
 // If you need to use this code under the less restrictive LGPL license, please comment the following line.
 // This will make the code slightly slower.
-#define USE_MAROTS_METHOD
+//#define USE_MAROTS_METHOD
 
 #include "delaunay.h"
 using namespace Del3D;
