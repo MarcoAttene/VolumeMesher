@@ -126,7 +126,7 @@ private:
 
 	bool validActiveNode(int& i) {
 		if (i == GC_UNLINKED) { if ((i = NextActiveNode()) == GC_UNLINKED) return false; }
-		if (nodes[i].parent == GC_UNLINKED) { if ((i = NextActiveNode()) == GC_UNLINKED) return false; }
+		if (nodes[i].parent == GC_UNLINKED) { nodes[i].isActive = false; if ((i = NextActiveNode()) == GC_UNLINKED) return false; }
 		return true;
 	}
 
