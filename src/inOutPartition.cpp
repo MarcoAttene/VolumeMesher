@@ -5,6 +5,7 @@
 #include "graphcut.h"
 
 using namespace IPs;
+using namespace VM_GC;
 
 // Label = 1 means INTERNAL
 // Label = 0 means EXTERNAL
